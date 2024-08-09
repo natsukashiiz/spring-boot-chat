@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
+
 @Service
 @Log4j2
 @RequiredArgsConstructor
@@ -32,53 +34,56 @@ public class AuthService {
 
     public ResponseEntity<?> login(LoginRequest request) throws BaseException {
         if (!StringUtils.hasText(request.getIdentifier())) {
-            log.warn("Login-[block]:(identifier is empty)");
+            log.warn("Login-[block]:(invalid identifier). request:{}", request);
             throw LoginException.identifierInvalid();
         }
 
-        var accountOptional = userRepository.findByUsernameOrMobile(request.getIdentifier(), request.getIdentifier());
-        if (accountOptional.isEmpty()) {
-            log.warn("Login-[block]:(not found account). identifier:{}", request.getIdentifier());
+        var userOptional = userRepository.findByUsernameOrMobile(request.getIdentifier(), request.getIdentifier());
+        if (userOptional.isEmpty()) {
+            log.warn("Login-[block]:(not found user). request:{}", request);
             throw LoginException.invalid();
         }
 
-        var response = createTokenResponse(accountOptional.get());
+        var response = createTokenResponse(userOptional.get());
         return ResponseUtils.success(response);
     }
 
     public ResponseEntity<?> signup(SignupRequest request) throws BaseException {
         if (ValidationUtils.invalidUsername(request.getUsername())) {
-            log.warn("Signup-[block]:(invalid username)");
-            throw SignupException.invalid();
-        }
-
-        if (ValidationUtils.invalidMobile(request.getMobile())) {
-            log.warn("Signup-[block]:(invalid mobile)");
+            log.warn("Signup-[block]:(invalid username). request:{}", request);
             throw SignupException.usernameInvalid();
         }
 
-        if (!StringUtils.hasText(request.getPassword())) {
-            log.warn("Signup-[block]:(password is empty)");
+        if (ValidationUtils.invalidMobile(request.getMobile())) {
+            log.warn("Signup-[block]:(invalid mobile). request:{}", request);
             throw SignupException.mobileInvalid();
         }
 
+        if (!StringUtils.hasText(request.getPassword())) {
+            log.warn("Signup-[block]:(invalid password). request:{}", request);
+            throw SignupException.passwordInvalid();
+        }
+
         if (userRepository.existsByUsername(request.getUsername())) {
-            log.warn("Signup-[block]:(username is already exists). username:{}", request.getUsername());
+            log.warn("Signup-[block]:(username is already exists). request:{}", request);
             throw SignupException.usernameExists();
         }
 
         if (userRepository.existsByMobile(request.getMobile())) {
-            log.warn("Signup-[block]:(mobile is already exists). mobile:{}", request.getMobile());
+            log.warn("Signup-[block]:(mobile is already exists). request:{}", request);
             throw SignupException.mobileExists();
         }
 
-        var account = new User();
-        account.setUsername(request.getUsername());
-        account.setPassword(passwordEncoder.encode(request.getPassword()));
+        var user = new User();
+        user.setUsername(request.getUsername());
+        user.setMobile(request.getMobile());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setNickname(request.getUsername());
+        user.setLastSeenAt(LocalDateTime.now());
 
-        userRepository.save(account);
+        userRepository.save(user);
 
-        var response = createTokenResponse(account);
+        var response = createTokenResponse(user);
         return ResponseUtils.success(response);
     }
 

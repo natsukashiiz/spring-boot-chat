@@ -16,6 +16,9 @@ public class SignupException extends BaseException {
     public static SignupException mobileInvalid() {
         return new SignupException("mobile.invalid");
     }
+    public static SignupException passwordInvalid() {
+        return new SignupException("password.invalid");
+    }
 
     public static SignupException usernameExists() {
         return new SignupException("username.exists");
