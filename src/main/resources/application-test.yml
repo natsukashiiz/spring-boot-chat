@@ -1,0 +1,52 @@
+server:
+  port: 710
+  shutdown: graceful
+
+spring:
+  application:
+    name: spring-boot-chat
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:9306/chat_db?useSSL=false&serverTimezone=UTC
+    username: root
+    password: 1234
+  jpa:
+    show-sql: true
+    generate-ddl: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    locations: classpath:db/migrations
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 1MB
+
+api:
+  jwt:
+    issuer: spring-boot-chat
+    public-key: classpath:jwt/public-key.pub
+    private-key: classpath:jwt/private-key.key
+    expiration:
+      access-token: 365d
+      refresh-token: 366d
+  files:
+    directory: src/main/resources/files
+    supported-types: image/jpeg, image/png, image/webp
+    base-url: http://localhost:710/v1/files/
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.springframework.web.servlet: DEBUG
+    org.springframework.messaging: DEBUG
+    org:springframework.security: DEBUG
+    org.springframework.web.socket: DEBUG
+    com.natsukashiiz.sbchat: DEBUG

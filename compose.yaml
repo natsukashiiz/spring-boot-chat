@@ -1,0 +1,8 @@
+services:
+  sbchat-mysql:
+    image: 'mysql:5.7'
+    environment:
+      - 'MYSQL_DATABASE=chat_db'
+      - 'MYSQL_ROOT_PASSWORD=1234'
+    ports:
+      - '9306:3306'
