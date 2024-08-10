@@ -7,13 +7,13 @@ import com.natsukashiiz.sbchat.exception.LoginException;
 import com.natsukashiiz.sbchat.exception.SignupException;
 import com.natsukashiiz.sbchat.model.request.LoginRequest;
 import com.natsukashiiz.sbchat.model.request.SignupRequest;
+import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.TokenResponse;
 import com.natsukashiiz.sbchat.repository.UserRepository;
 import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import com.natsukashiiz.sbchat.utils.ValidationUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -32,7 +32,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
 
-    public ResponseEntity<?> login(LoginRequest request) throws BaseException {
+    public ApiResponse<TokenResponse> login(LoginRequest request) throws BaseException {
         if (!StringUtils.hasText(request.getIdentifier())) {
             log.warn("Login-[block]:(invalid identifier). request:{}", request);
             throw LoginException.identifierInvalid();
@@ -48,7 +48,7 @@ public class AuthService {
         return ResponseUtils.success(response);
     }
 
-    public ResponseEntity<?> signup(SignupRequest request) throws BaseException {
+    public ApiResponse<TokenResponse> signup(SignupRequest request) throws BaseException {
         if (ValidationUtils.invalidUsername(request.getUsername())) {
             log.warn("Signup-[block]:(invalid username). request:{}", request);
             throw SignupException.usernameInvalid();

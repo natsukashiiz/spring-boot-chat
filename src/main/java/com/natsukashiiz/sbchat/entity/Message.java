@@ -4,11 +4,13 @@ import com.natsukashiiz.sbchat.common.MessageType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "messages")
+@SQLRestriction("deleted_at IS NULL")
 public class Message extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
@@ -17,7 +19,7 @@ public class Message extends BaseEntity {
     private String content;
 
     @ManyToOne
-    private User user;
+    private User sender;
 
     @ManyToOne
     private Room room;

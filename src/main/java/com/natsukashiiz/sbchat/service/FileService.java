@@ -6,6 +6,7 @@ import com.natsukashiiz.sbchat.entity.File;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.exception.FileException;
 import com.natsukashiiz.sbchat.model.request.UploadFileRequest;
+import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.FileLoadAsResourceResponse;
 import com.natsukashiiz.sbchat.model.response.UploadFileResponse;
 import com.natsukashiiz.sbchat.repository.FileRepository;
@@ -15,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.UrlResource;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -47,7 +47,7 @@ public class FileService {
     private final FileRepository fileRepository;
     private final AuthService authService;
 
-    public ResponseEntity<?> upload(UploadFileRequest request) throws BaseException {
+    public ApiResponse<UploadFileResponse> upload(UploadFileRequest request) throws BaseException {
         var user = authService.getUser();
         var file = request.getFile();
         try {
@@ -169,7 +169,7 @@ public class FileService {
         }
     }
 
-    public ResponseEntity<?> deleteByUrl(String url) throws BaseException {
+    public ApiResponse<Object> deleteByUrl(String url) throws BaseException {
         var user = authService.getUser();
 
         if (!StringUtils.hasText(url)) {

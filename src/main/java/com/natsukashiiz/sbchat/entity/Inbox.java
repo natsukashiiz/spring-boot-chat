@@ -5,11 +5,13 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "inboxes")
+@SQLRestriction("deleted_at IS NULL")
 public class Inbox extends BaseEntity {
 
     @ManyToOne

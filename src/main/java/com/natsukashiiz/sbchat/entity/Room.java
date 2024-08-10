@@ -4,11 +4,17 @@ import com.natsukashiiz.sbchat.common.RoomType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "rooms")
+@SQLRestriction("deleted_at IS NULL")
 public class Room extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
@@ -19,4 +25,12 @@ public class Room extends BaseEntity {
 
     private String name;
     private String image;
+
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
+    @OrderBy("id DESC, createdAt DESC")
+    private List<Message> messages = new ArrayList<>();
+
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
+    @OrderBy("id DESC, createdAt DESC")
+    private List<RoomMember> members = new ArrayList<>();
 }

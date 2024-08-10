@@ -4,6 +4,8 @@ package com.natsukashiiz.sbchat.controller;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.model.request.DeleteFileRequest;
 import com.natsukashiiz.sbchat.model.request.UploadFileRequest;
+import com.natsukashiiz.sbchat.model.response.ApiResponse;
+import com.natsukashiiz.sbchat.model.response.UploadFileResponse;
 import com.natsukashiiz.sbchat.service.FileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -18,7 +20,7 @@ public class FileController {
     private final FileService fileService;
 
     @PostMapping("/upload")
-    public ResponseEntity<?> upload(@ModelAttribute UploadFileRequest request) throws BaseException {
+    public ApiResponse<UploadFileResponse> upload(@ModelAttribute UploadFileRequest request) throws BaseException {
         return fileService.upload(request);
     }
 
@@ -36,7 +38,7 @@ public class FileController {
     }
 
     @DeleteMapping
-    public ResponseEntity<?> delete(@RequestBody DeleteFileRequest request) throws BaseException {
+    public ApiResponse<Object> delete(@RequestBody DeleteFileRequest request) throws BaseException {
         return fileService.deleteByUrl(request.getUrl());
     }
 }

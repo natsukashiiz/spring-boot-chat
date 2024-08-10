@@ -7,9 +7,9 @@ import java.time.Instant;
 
 @Setter
 @Getter
-public class SuccessResponse {
+public class ApiResponse<T> {
     private int status;
-    private Object data;
+    private T data;
     private Long total;
     private Instant timestamp = Instant.now();
 }

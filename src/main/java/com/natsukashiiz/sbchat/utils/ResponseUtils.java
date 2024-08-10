@@ -1,32 +1,37 @@
 package com.natsukashiiz.sbchat.utils;
 
-import com.natsukashiiz.sbchat.model.response.SuccessResponse;
+import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+
+import java.util.List;
 
 public class ResponseUtils {
 
     private final static HttpStatus SUCCESS = HttpStatus.OK;
 
-    public static ResponseEntity<Object> success() {
-        var response = new SuccessResponse();
+    public static ApiResponse<Object> success() {
+        var response = new ApiResponse<>();
         response.setStatus(SUCCESS.value());
         response.setData(null);
-        return new ResponseEntity<>(response, SUCCESS);
+        return response;
     }
 
-    public static ResponseEntity<Object> success(Object data) {
-        var response = new SuccessResponse();
+    public static <T> ApiResponse<T> success(T data) {
+        var response = new ApiResponse<T>();
         response.setStatus(SUCCESS.value());
         response.setData(data);
-        return new ResponseEntity<>(response, SUCCESS);
+        return response;
     }
 
-    public static ResponseEntity<Object> successList(Object data, long total) {
-        var response = new SuccessResponse();
+    public static <T> ApiResponse<List<T>> successList(List<T> data, long total) {
+        var response = new ApiResponse<List<T>>();
         response.setStatus(SUCCESS.value());
         response.setData(data);
         response.setTotal(total);
-        return new ResponseEntity<>(response, SUCCESS);
+        return response;
+    }
+
+    public static <T> ApiResponse<List<T>> successList(List<T> data) {
+        return successList(data, data.size());
     }
 }
