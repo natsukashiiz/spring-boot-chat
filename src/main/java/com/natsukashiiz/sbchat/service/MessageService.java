@@ -84,6 +84,8 @@ public class MessageService {
             inboxRepository.save(inbox);
         }
 
+        // ส่งข้อความไปยังห้องที่กำหนด
+
         var response = createMessageResponse(message);
         return ResponseUtils.success(response);
     }

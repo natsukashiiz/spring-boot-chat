@@ -29,6 +29,8 @@ public class FriendService {
     private final UserRepository userRepository;
     private final InboxRepository inboxRepository;
     private final RoomRepository roomRepository;
+    private final RoomMemberRepository roomMemberRepository;
+    private final MessageRepository messageRepository;
 
     public ApiResponse<List<FriendResponse>> getFriends(FriendStatus status) throws BaseException {
         var user = authService.getUser();
@@ -110,54 +112,52 @@ public class FriendService {
 
         var roomEntity = new Room();
         roomEntity.setType(RoomType.Friend);
+        roomRepository.save(roomEntity);
 
-        // self
-        {
-            var selfRoomMemberEntity = new RoomMember();
-            selfRoomMemberEntity.setUser(friend.getFriend());
-            selfRoomMemberEntity.setRoom(roomEntity);
-            selfRoomMemberEntity.setMuted(false);
-            roomEntity.getMembers().add(selfRoomMemberEntity);
+        var selfRoomMemberEntity = new RoomMember();
+        selfRoomMemberEntity.setUser(friend.getFriend());
+        selfRoomMemberEntity.setRoom(roomEntity);
+        selfRoomMemberEntity.setMuted(false);
+//        roomEntity.getMembers().add(selfRoomMemberEntity);
+        roomMemberRepository.save(selfRoomMemberEntity);
 
-            var selfMessageEntity = new Message();
-            selfMessageEntity.setRoom(roomEntity);
-            selfMessageEntity.setSender(friend.getFriend());
-            selfMessageEntity.setType(MessageType.Join);
-            selfMessageEntity.setContent("You are now friends");
-            roomEntity.getMembers().add(selfRoomMemberEntity);
+        var selfMessageEntity = new Message();
+        selfMessageEntity.setRoom(roomEntity);
+        selfMessageEntity.setSender(friend.getFriend());
+        selfMessageEntity.setType(MessageType.Join);
+        selfMessageEntity.setContent("You are now friends");
+//        roomEntity.getMembers().add(selfRoomMemberEntity);
+        messageRepository.save(selfMessageEntity);
 
-            var selfInboxEntity = new Inbox();
-            selfInboxEntity.setRoom(roomEntity);
-            selfInboxEntity.setUser(friend.getFriend());
-            selfInboxEntity.setLastMessage(selfMessageEntity);
-            selfInboxEntity.setUnreadCount(1);
-            inboxRepository.save(selfInboxEntity);
-        }
+        var selfInboxEntity = new Inbox();
+        selfInboxEntity.setRoom(roomEntity);
+        selfInboxEntity.setUser(friend.getFriend());
+        selfInboxEntity.setLastMessage(selfMessageEntity);
+        selfInboxEntity.setUnreadCount(1);
+        inboxRepository.save(selfInboxEntity);
 
         // friend
-        {
-            var friendRoomMemberEntity = new RoomMember();
-            friendRoomMemberEntity.setUser(friend.getUser());
-            friendRoomMemberEntity.setRoom(roomEntity);
-            friendRoomMemberEntity.setMuted(false);
-            roomEntity.getMembers().add(friendRoomMemberEntity);
+        var friendRoomMemberEntity = new RoomMember();
+        friendRoomMemberEntity.setUser(friend.getUser());
+        friendRoomMemberEntity.setRoom(roomEntity);
+        friendRoomMemberEntity.setMuted(false);
+//        roomEntity.getMembers().add(friendRoomMemberEntity);
+        roomMemberRepository.save(friendRoomMemberEntity);
 
-            var friendMessageEntity = new Message();
-            friendMessageEntity.setRoom(roomEntity);
-            friendMessageEntity.setSender(friend.getUser());
-            friendMessageEntity.setType(MessageType.Join);
-            friendMessageEntity.setContent("You are now friends");
-            roomEntity.getMembers().add(friendRoomMemberEntity);
+        var friendMessageEntity = new Message();
+        friendMessageEntity.setRoom(roomEntity);
+        friendMessageEntity.setSender(friend.getUser());
+        friendMessageEntity.setType(MessageType.Join);
+        friendMessageEntity.setContent("You are now friends");
+//        roomEntity.getMembers().add(friendRoomMemberEntity);
+        messageRepository.save(friendMessageEntity);
 
-            var friendInboxEntity = new Inbox();
-            friendInboxEntity.setRoom(roomEntity);
-            friendInboxEntity.setUser(friend.getUser());
-            friendInboxEntity.setLastMessage(friendMessageEntity);
-            friendInboxEntity.setUnreadCount(1);
-            inboxRepository.save(friendInboxEntity);
-        }
-
-        roomRepository.save(roomEntity);
+        var friendInboxEntity = new Inbox();
+        friendInboxEntity.setRoom(roomEntity);
+        friendInboxEntity.setUser(friend.getUser());
+        friendInboxEntity.setLastMessage(friendMessageEntity);
+        friendInboxEntity.setUnreadCount(1);
+        inboxRepository.save(friendInboxEntity);
 
         var response = createFriendResponse(friend);
         return ResponseUtils.success(response);
