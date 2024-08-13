@@ -1,10 +1,11 @@
 package com.natsukashiiz.sbchat.controller;
 
 import com.natsukashiiz.sbchat.common.FriendStatus;
-import com.natsukashiiz.sbchat.model.response.FriendResponse;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
+import com.natsukashiiz.sbchat.model.response.FriendResponse;
 import com.natsukashiiz.sbchat.service.FriendService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/v1/friends")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class FriendController {
 
     private final FriendService friendService;
@@ -20,6 +22,11 @@ public class FriendController {
     @GetMapping
     public ApiResponse<List<FriendResponse>> getFriends(@RequestParam FriendStatus status) throws BaseException {
         return friendService.getFriends(status);
+    }
+
+    @GetMapping("/search")
+    public ApiResponse<FriendResponse> searchFriend(@RequestParam String identifier) throws BaseException {
+        return friendService.searchFriend(identifier);
     }
 
     @PostMapping("/{friendId}/apply")

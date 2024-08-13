@@ -7,6 +7,7 @@ import com.natsukashiiz.sbchat.model.request.UpdateGroupRequest;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.RoomResponse;
 import com.natsukashiiz.sbchat.service.GroupService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/v1/groups")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class GroupController {
 
     private final GroupService groupService;

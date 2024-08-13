@@ -9,4 +9,8 @@ public class MessageException extends BaseException {
     public static BaseException notMember() {
         return new MessageException("not.member");
     }
+
+    public static BaseException notFriend() {
+        return new MessageException("not.friend");
+    }
 }

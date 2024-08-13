@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public interface RoomRepository extends JpaRepository<Room, Long> {
     List<Room> findByMembersUserIdAndType(Long userId, RoomType type);
+    List<Room> findByMembersUserIdAndTypeOrderByCreatedAtDesc(Long userId, RoomType type);
 
     Optional<Room> findByIdAndMembersUserId(Long roomId, Long userId);
 

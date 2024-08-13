@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Service
 @Log4j2
@@ -79,7 +79,6 @@ public class AuthService {
         user.setMobile(request.getMobile());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getUsername());
-        user.setLastSeenAt(LocalDateTime.now());
 
         userRepository.save(user);
 
@@ -119,13 +118,19 @@ public class AuthService {
             throw AuthException.unauthorized();
         }
 
-        var accountOptional = userRepository.findById(Long.parseLong(accountId));
-        if (accountOptional.isEmpty()) {
+        var userOptional = userRepository.findById(Long.parseLong(accountId));
+        if (userOptional.isEmpty()) {
             log.warn("GetUser-[block]:(not found account). accountId:{}", accountId);
             throw AuthException.unauthorized();
         }
 
-        return accountOptional.get();
+        var user = userOptional.get();
+        if (Objects.nonNull(user.getDeletedAt())) {
+            log.warn("GetUser-[block]:(account is deleted). accountId:{}", accountId);
+            throw AuthException.unauthorized();
+        }
+
+        return user;
     }
 
     public boolean anonymous() {

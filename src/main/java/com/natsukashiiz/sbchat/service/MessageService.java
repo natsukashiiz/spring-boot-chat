@@ -1,5 +1,6 @@
 package com.natsukashiiz.sbchat.service;
 
+import com.natsukashiiz.sbchat.common.FriendStatus;
 import com.natsukashiiz.sbchat.common.RoomType;
 import com.natsukashiiz.sbchat.entity.Message;
 import com.natsukashiiz.sbchat.entity.Room;
@@ -11,6 +12,7 @@ import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.MessageResponse;
 import com.natsukashiiz.sbchat.model.response.RoomResponse;
 import com.natsukashiiz.sbchat.model.response.UserResponse;
+import com.natsukashiiz.sbchat.repository.FriendRepository;
 import com.natsukashiiz.sbchat.repository.InboxRepository;
 import com.natsukashiiz.sbchat.repository.MessageRepository;
 import com.natsukashiiz.sbchat.repository.RoomMemberRepository;
@@ -33,6 +35,7 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final RoomMemberRepository roomMemberRepository;
     private final InboxRepository inboxRepository;
+    private final FriendRepository friendRepository;
 
     public ApiResponse<List<MessageResponse>> getMessages(Long roomId) throws BaseException {
         var user = authService.getUser();
@@ -64,6 +67,29 @@ public class MessageService {
                 });
 
         var room = roomMember.getRoom();
+
+        if (room.getType() == RoomType.Friend) {
+            var friendId = room.getMembers().stream()
+                    .filter(member -> !member.getUser().getId().equals(user.getId()))
+                    .map(member -> member.getUser().getId())
+                    .findFirst()
+                    .orElseThrow();
+
+            var friend = friendRepository.findByUserIdAndFriendId(user.getId(), friendId).orElseThrow(() -> {
+                log.warn("SendMessage-[block]:(not friend). userId:{}, friendId:{}, request:{}", user.getId(), room.getId(), request);
+                return MessageException.notFriend();
+            });
+
+            if (Objects.nonNull(friend.getDeletedAt())) {
+                log.warn("SendMessage-[block]:(friend deleted). userId:{}, friendId:{}, request:{}", user.getId(), room.getId(), request);
+                throw MessageException.notFriend();
+            }
+
+            if (friend.getStatus() != FriendStatus.Friend) {
+                log.warn("SendMessage-[block]:(status not friend). userId:{}, friendId:{}, request:{}", user.getId(), room.getId(), request);
+                throw MessageException.notFriend();
+            }
+        }
 
         var message = new Message();
         message.setRoom(room);

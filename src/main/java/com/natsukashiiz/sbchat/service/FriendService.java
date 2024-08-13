@@ -34,13 +34,32 @@ public class FriendService {
 
     public ApiResponse<List<FriendResponse>> getFriends(FriendStatus status) throws BaseException {
         var user = authService.getUser();
-        var friends = friendRepository.findAllByUserIdOrFriendIdAndStatus(user.getId(), user.getId(), status);
 
-        var response = friends.stream().map(this::createFriendResponse).toList();
 
+        List<FriendResponse> responses;
+        if (status == FriendStatus.Apply) {
+            responses = friendRepository.findAllByFriendIdAndStatus(user.getId(), status).stream().map(friend -> createFriendResponse(friend.getUser(), status)).toList();
+        } else {
+            responses = friendRepository.findAllByUserIdAndStatus(user.getId(), status).stream().map(friend -> createFriendResponse(friend.getFriend(), status)).toList();
+        }
+
+        return ResponseUtils.success(responses);
+    }
+
+    public ApiResponse<FriendResponse> searchFriend(String identifier) throws BaseException {
+        var user = authService.getUser();
+
+        var friend = userRepository.findByUsernameOrMobile(identifier, identifier).orElseThrow(() -> {
+            log.warn("SearchFriend-[block]:(friend not found). userId:{}, identifier:{}", user.getId(), identifier);
+            return FriendException.notFound();
+        });
+
+        var selfFriend = friendRepository.findByUserIdAndFriendId(user.getId(), friend.getId()).orElse(new Friend());
+        var response = createFriendResponse(friend, selfFriend.getStatus());
         return ResponseUtils.success(response);
     }
 
+    @Transactional
     public ApiResponse<FriendResponse> applyFriend(Long friendId) throws BaseException {
         var user = authService.getUser();
 
@@ -49,28 +68,32 @@ public class FriendService {
             throw FriendException.applyToSelf();
         }
 
-        var friend = userRepository.findById(friendId).orElseThrow(() -> {
+        var friend = userRepository.findByIdAndDeletedAtIsNull(friendId).orElseThrow(() -> {
             log.warn("ApplyFriend-[block]:(friend not found). userId:{}, friendId:{}", user.getId(), friendId);
             return FriendException.notFound();
         });
 
-        if (friendRepository.existsByUserIdAndFriendId(user.getId(), friend.getId())) {
-            log.warn("ApplyFriend-[block]:(already applied from self). userId:{}, friendId:{}", user.getId(), friendId);
-            throw FriendException.duplicate();
-        }
-
-        if (friendRepository.existsByUserIdAndFriendId(friend.getId(), user.getId())) {
-            log.warn("ApplyFriend-[block]:(already applied from friend). userId:{}, friendId:{}", user.getId(), friendId);
-            throw FriendException.duplicate();
-        }
-
         var applyFriendEntity = new Friend();
+        var selfFriendOptional = friendRepository.findByUserIdAndFriendId(user.getId(), friendId);
+
+        if (selfFriendOptional.isPresent()) {
+            var selfFriend = selfFriendOptional.get();
+            if (Objects.isNull(selfFriend.getDeletedAt())) {
+                log.warn("ApplyFriend-[block]:(already applied from self). userId:{}, friendId:{}", user.getId(), friendId);
+                throw FriendException.duplicate();
+            } else {
+                friendRepository.updateDeleteAtNullByUserIdAndFriendId(user.getId(), friendId);
+                applyFriendEntity.setId(selfFriend.getId());
+                applyFriendEntity.setVersion(selfFriend.getVersion());
+            }
+        }
+
         applyFriendEntity.setUser(user);
         applyFriendEntity.setFriend(friend);
         applyFriendEntity.setStatus(FriendStatus.Apply);
-
         friendRepository.save(applyFriendEntity);
-        var response = createFriendResponse(applyFriendEntity);
+
+        var response = createFriendResponse(applyFriendEntity.getFriend(), applyFriendEntity.getStatus());
 
         return ResponseUtils.success(response);
     }
@@ -88,7 +111,11 @@ public class FriendService {
             throw FriendException.notApply();
         }
 
-        friendRepository.delete(friend);
+        if (Objects.nonNull(friend.getDeletedAt())) {
+            friendRepository.softDeleteByUserIdAndFriendId(user.getId(), friendId);
+        } else {
+            friendRepository.delete(friend);
+        }
 
         return ResponseUtils.success();
     }
@@ -107,66 +134,85 @@ public class FriendService {
             throw FriendException.notApply();
         }
 
-        friend.setStatus(FriendStatus.Friend);
-        friendRepository.save(friend);
+        var selfUser = friend.getFriend();
+        var friendUser = friend.getUser();
 
         var roomEntity = new Room();
-        roomEntity.setType(RoomType.Friend);
-        roomRepository.save(roomEntity);
 
-        var selfRoomMemberEntity = new RoomMember();
-        selfRoomMemberEntity.setUser(friend.getFriend());
-        selfRoomMemberEntity.setRoom(roomEntity);
-        selfRoomMemberEntity.setMuted(false);
-//        roomEntity.getMembers().add(selfRoomMemberEntity);
-        roomMemberRepository.save(selfRoomMemberEntity);
+        var selfFriend = friendRepository.findByUserIdAndFriendId(user.getId(), friendId).orElse(new Friend());
+
+        // เคยเป็นเพื่อนกัน
+        if (Objects.nonNull(selfFriend.getDeletedAt())) {
+            friendRepository.updateDeleteAtNullByUserIdAndFriendId(friendId, user.getId());
+            friend.setDeletedAt(null);
+
+            selfFriend.setStatus(FriendStatus.Friend);
+            friendRepository.save(selfFriend);
+
+            roomEntity = friend.getRoom();
+        } else {
+            roomEntity.setType(RoomType.Friend);
+            roomRepository.save(roomEntity);
+
+            selfFriend.setUser(selfUser);
+            selfFriend.setFriend(friendUser);
+            selfFriend.setRoom(roomEntity);
+            selfFriend.setStatus(FriendStatus.Friend);
+            friendRepository.save(selfFriend);
+
+            var selfRoomMemberEntity = new RoomMember();
+            selfRoomMemberEntity.setUser(selfUser);
+            selfRoomMemberEntity.setRoom(roomEntity);
+            selfRoomMemberEntity.setMuted(false);
+            roomMemberRepository.save(selfRoomMemberEntity);
+
+            var friendRoomMemberEntity = new RoomMember();
+            friendRoomMemberEntity.setUser(friendUser);
+            friendRoomMemberEntity.setRoom(roomEntity);
+            friendRoomMemberEntity.setMuted(false);
+            roomMemberRepository.save(friendRoomMemberEntity);
+        }
 
         var selfMessageEntity = new Message();
         selfMessageEntity.setRoom(roomEntity);
-        selfMessageEntity.setSender(friend.getFriend());
+        selfMessageEntity.setSender(selfUser);
         selfMessageEntity.setType(MessageType.Join);
         selfMessageEntity.setContent("You are now friends");
-//        roomEntity.getMembers().add(selfRoomMemberEntity);
         messageRepository.save(selfMessageEntity);
 
-        var selfInboxEntity = new Inbox();
+        var selfInboxEntity = inboxRepository.findByRoomIdAndUserId(roomEntity.getId(), selfUser.getId()).orElse(new Inbox());
         selfInboxEntity.setRoom(roomEntity);
-        selfInboxEntity.setUser(friend.getFriend());
+        selfInboxEntity.setUser(selfUser);
         selfInboxEntity.setLastMessage(selfMessageEntity);
         selfInboxEntity.setUnreadCount(1);
         inboxRepository.save(selfInboxEntity);
 
-        // friend
-        var friendRoomMemberEntity = new RoomMember();
-        friendRoomMemberEntity.setUser(friend.getUser());
-        friendRoomMemberEntity.setRoom(roomEntity);
-        friendRoomMemberEntity.setMuted(false);
-//        roomEntity.getMembers().add(friendRoomMemberEntity);
-        roomMemberRepository.save(friendRoomMemberEntity);
-
         var friendMessageEntity = new Message();
         friendMessageEntity.setRoom(roomEntity);
-        friendMessageEntity.setSender(friend.getUser());
+        friendMessageEntity.setSender(friendUser);
         friendMessageEntity.setType(MessageType.Join);
         friendMessageEntity.setContent("You are now friends");
-//        roomEntity.getMembers().add(friendRoomMemberEntity);
         messageRepository.save(friendMessageEntity);
 
-        var friendInboxEntity = new Inbox();
+        var friendInboxEntity = inboxRepository.findByRoomIdAndUserId(roomEntity.getId(), friendUser.getId()).orElse(new Inbox());
         friendInboxEntity.setRoom(roomEntity);
-        friendInboxEntity.setUser(friend.getUser());
+        friendInboxEntity.setUser(friendUser);
         friendInboxEntity.setLastMessage(friendMessageEntity);
         friendInboxEntity.setUnreadCount(1);
         inboxRepository.save(friendInboxEntity);
 
-        var response = createFriendResponse(friend);
+        friend.setStatus(FriendStatus.Friend);
+        friend.setRoom(roomEntity);
+        friendRepository.save(friend);
+
+        var response = createFriendResponse(friendUser, friend.getStatus());
         return ResponseUtils.success(response);
     }
 
     public ApiResponse<Object> rejectFriend(Long friendId) throws BaseException {
         var user = authService.getUser();
 
-        var friend = friendRepository.findByUserIdAndFriendId(user.getId(), friendId).orElseThrow(() -> {
+        var friend = friendRepository.findByUserIdAndFriendId(friendId, user.getId()).orElseThrow(() -> {
             log.warn("RejectFriend-[block]:(apply not found). userId:{}, friendId:{}", user.getId(), friendId);
             return FriendException.notFound();
         });
@@ -181,46 +227,59 @@ public class FriendService {
         return ResponseUtils.success();
     }
 
+    @Transactional
     public ApiResponse<FriendResponse> blockFriend(Long friendId) throws BaseException {
         var user = authService.getUser();
 
-        var friend = friendRepository.findByUserIdAndFriendId(user.getId(), friendId).orElseThrow(() -> {
-            log.warn("BlockFriend-[block]:(friend not found). userId:{}, friendId:{}", user.getId(), friendId);
+        var selfFriend = friendRepository.findByUserIdAndFriendId(user.getId(), friendId).orElseThrow(() -> {
+            log.warn("BlockFriend-[block]:(selfFriend not found). userId:{}, friendId:{}", user.getId(), friendId);
             return FriendException.notFound();
         });
 
-        if (friend.getStatus() != FriendStatus.Friend) {
-            log.warn("BlockFriend-[block]:(not friend). userId:{}, friendId:{}, status:{}", user.getId(), friendId, friend.getStatus());
+        if (selfFriend.getStatus() != FriendStatus.Friend) {
+            log.warn("BlockFriend-[block]:(not selfFriend). userId:{}, friendId:{}, status:{}", user.getId(), friendId, selfFriend.getStatus());
             throw FriendException.notFriend();
         }
 
-        friend.setStatus(FriendStatus.Blocked);
-        friendRepository.save(friend);
-        var response = createFriendResponse(friend);
+        selfFriend.setStatus(FriendStatus.BlockBySelf);
+        friendRepository.save(selfFriend);
+
+        var friendSelf = friendRepository.findByUserIdAndFriendId(friendId, user.getId()).get();
+        friendSelf.setStatus(FriendStatus.BlockByFriend);
+        friendRepository.save(friendSelf);
+
+        var response = createFriendResponse(selfFriend.getFriend(), selfFriend.getStatus());
 
         return ResponseUtils.success(response);
     }
 
+    @Transactional
     public ApiResponse<FriendResponse> unblockFriend(Long friendId) throws BaseException {
         var user = authService.getUser();
 
-        var friend = friendRepository.findByUserIdAndFriendId(user.getId(), friendId).orElseThrow(() -> {
-            log.warn("UnblockFriend-[block]:(friend not found). userId:{}, friendId:{}", user.getId(), friendId);
+        var selfFriend = friendRepository.findByUserIdAndFriendId(user.getId(), friendId).orElseThrow(() -> {
+            log.warn("UnblockFriend-[block]:(selfFriend not found). userId:{}, friendId:{}", user.getId(), friendId);
             return FriendException.notFound();
         });
 
-        if (friend.getStatus() != FriendStatus.Blocked) {
-            log.warn("UnblockFriend-[block]:(not blocked). userId:{}, friendId:{}, status:{}", user.getId(), friendId, friend.getStatus());
+        if (selfFriend.getStatus() != FriendStatus.BlockBySelf) {
+            log.warn("UnblockFriend-[block]:(not blocked). userId:{}, friendId:{}, status:{}", user.getId(), friendId, selfFriend.getStatus());
             throw FriendException.notBlocked();
         }
 
-        friend.setStatus(FriendStatus.Friend);
-        friendRepository.save(friend);
-        var response = createFriendResponse(friend);
+        selfFriend.setStatus(FriendStatus.Friend);
+        friendRepository.save(selfFriend);
+
+        var friendSelf = friendRepository.findByUserIdAndFriendId(friendId, user.getId()).get();
+        friendSelf.setStatus(FriendStatus.Friend);
+        friendRepository.save(friendSelf);
+
+        var response = createFriendResponse(selfFriend.getFriend(), selfFriend.getStatus());
 
         return ResponseUtils.success(response);
     }
 
+    @Transactional
     public ApiResponse<Object> unfriend(Long friendId) throws BaseException {
         var user = authService.getUser();
 
@@ -229,23 +288,32 @@ public class FriendService {
             return FriendException.notFound();
         });
 
-        friendRepository.delete(friend);
+        if (Objects.nonNull(friend.getDeletedAt())) {
+            log.warn("Unfriend-[block]:(not friend). userId:{}, friendId:{}, status:{}", user.getId(), friendId, friend.getStatus());
+            throw FriendException.notFriend();
+        }
+
+        friendRepository.softDeleteByUserIdAndFriendId(user.getId(), friendId);
+        friendRepository.softDeleteByUserIdAndFriendId(friendId, user.getId());
 
         return ResponseUtils.success();
     }
 
-    private FriendResponse createFriendResponse(Friend friend) {
+    private FriendResponse createFriendResponse(User friend, FriendStatus status) {
         var friendResponse = new UserResponse();
-        friendResponse.setId(friend.getFriend().getId());
-        friendResponse.setUsername(friend.getFriend().getUsername());
-        friendResponse.setMobile(friend.getFriend().getMobile());
-        friendResponse.setNickname(friend.getFriend().getNickname());
-        friendResponse.setAvatar(friend.getFriend().getAvatar());
-        friendResponse.setLastSeenAt(friend.getFriend().getLastSeenAt());
+        friendResponse.setId(friend.getId());
+        friendResponse.setUsername(friend.getUsername());
+        friendResponse.setMobile(friend.getMobile());
+        friendResponse.setNickname(friend.getNickname());
+        friendResponse.setAvatar(friend.getAvatar());
+
+        if (status == FriendStatus.Friend) {
+            friendResponse.setLastSeenAt(friend.getLastSeenAt());
+        }
 
         var response = new FriendResponse();
         response.setFriend(friendResponse);
-        response.setStatus(friend.getStatus());
+        response.setStatus(status);
         return response;
     }
 }

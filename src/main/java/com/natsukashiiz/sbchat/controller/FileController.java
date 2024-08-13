@@ -7,6 +7,7 @@ import com.natsukashiiz.sbchat.model.request.UploadFileRequest;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.UploadFileResponse;
 import com.natsukashiiz.sbchat.service.FileService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/v1/files")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class FileController {
 
     private final FileService fileService;

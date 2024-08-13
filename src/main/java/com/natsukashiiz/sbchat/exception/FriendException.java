@@ -29,4 +29,16 @@ public class FriendException extends BaseException {
     public static BaseException notBlocked() {
         return new FriendException("not.blocked");
     }
+
+    public static BaseException alreadyApplied() {
+        return new FriendException("already.applied");
+    }
+
+    public static BaseException alreadyFriend() {
+        return new FriendException("already.friend");
+    }
+
+    public static BaseException blockedBySelf() {
+        return new FriendException("blocked.by.self");
+    }
 }

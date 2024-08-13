@@ -1,5 +1,6 @@
 package com.natsukashiiz.sbchat.service;
 
+import com.natsukashiiz.sbchat.common.RoomType;
 import com.natsukashiiz.sbchat.entity.Inbox;
 import com.natsukashiiz.sbchat.entity.User;
 import com.natsukashiiz.sbchat.exception.BaseException;
@@ -43,10 +44,17 @@ public class InboxService {
         roomResponse.setName(room.getName());
         roomResponse.setImage(room.getImage());
 
-        var owner = room.getOwner();
-        if (Objects.nonNull(owner)) {
-            var ownerResponse = createUserResponse(owner);
-            roomResponse.setOwner(ownerResponse);
+        var members = room.getMembers();
+        if (room.getType() == RoomType.Friend) {
+            var friend = members.stream()
+                    .filter(m -> !m.getUser().getId().equals(inbox.getUser().getId()))
+                    .findFirst()
+                    .orElseThrow();
+            roomResponse.setFriend(createUserResponse(friend.getUser()));
+        } else {
+            roomResponse.setMembers(members.stream()
+                    .map(m -> createMemberResponse(m.getUser(), room.getOwner()))
+                    .toList());
         }
 
         var lastMessageResponse = new MessageResponse();
@@ -75,6 +83,18 @@ public class InboxService {
         response.setNickname(user.getNickname());
         response.setAvatar(user.getAvatar());
         response.setLastSeenAt(user.getLastSeenAt());
+        return response;
+    }
+
+    private MemberGroupResponse createMemberResponse(User user, User owner) {
+        var response = new MemberGroupResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setMobile(user.getMobile());
+        response.setNickname(user.getNickname());
+        response.setAvatar(user.getAvatar());
+        response.setLastSeenAt(user.getLastSeenAt());
+        response.setOwner(Objects.equals(user.getId(), owner.getId()));
         return response;
     }
 }

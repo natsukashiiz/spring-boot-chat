@@ -11,7 +11,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Setter
 @Entity
 @Table(name = "inboxes")
-@SQLRestriction("deleted_at IS NULL")
+//@SQLRestriction("deleted_at IS NULL")
 public class Inbox extends BaseEntity {
 
     @ManyToOne

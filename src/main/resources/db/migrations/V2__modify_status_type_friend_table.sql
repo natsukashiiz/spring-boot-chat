@@ -1,0 +1,1 @@
+ALTER TABLE `friends` MODIFY COLUMN `status` ENUM ('Apply', 'Friend', 'BlockBySelf', 'BlockByFriend') NOT NULL;

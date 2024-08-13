@@ -11,7 +11,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Setter
 @Entity
 @Table(name = "message_reads")
-@SQLRestriction("deleted_at IS NULL")
+//@SQLRestriction("deleted_at IS NULL")
 public class MessageRead extends BaseEntity {
 
     @ManyToOne

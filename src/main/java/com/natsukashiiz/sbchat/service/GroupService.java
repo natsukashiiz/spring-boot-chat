@@ -10,6 +10,7 @@ import com.natsukashiiz.sbchat.model.request.AddMembersGroupRequest;
 import com.natsukashiiz.sbchat.model.request.CreateGroupRequest;
 import com.natsukashiiz.sbchat.model.request.UpdateGroupRequest;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
+import com.natsukashiiz.sbchat.model.response.MemberGroupResponse;
 import com.natsukashiiz.sbchat.model.response.RoomResponse;
 import com.natsukashiiz.sbchat.model.response.UserResponse;
 import com.natsukashiiz.sbchat.repository.RoomMemberRepository;
@@ -37,7 +38,7 @@ public class GroupService {
 
     public ApiResponse<List<RoomResponse>> getGroups() throws BaseException {
         var user = authService.getUser();
-        var rooms = roomRepository.findByMembersUserIdAndType(user.getId(), RoomType.Group);
+        var rooms = roomRepository.findByMembersUserIdAndTypeOrderByCreatedAtDesc(user.getId(), RoomType.Group);
         var response = rooms.stream()
                 .map(this::createGroupRoomResponse)
                 .toList();
@@ -209,22 +210,23 @@ public class GroupService {
         response.setType(room.getType());
         response.setName(room.getName());
         response.setImage(room.getImage());
-        response.setOwner(createMemberResponse(room.getOwner()));
         response.setMembers(room.getMembers().stream()
                 .map(RoomMember::getUser)
-                .map(this::createMemberResponse)
+                .map(m -> createMemberResponse(m, room.getOwner()))
+                .sorted((a, b) -> Boolean.compare(b.isOwner(), a.isOwner()))
                 .toList());
         return response;
     }
 
-    private UserResponse createMemberResponse(User user) {
-        var response = new UserResponse();
+    private MemberGroupResponse createMemberResponse(User user, User owner) {
+        var response = new MemberGroupResponse();
         response.setId(user.getId());
         response.setUsername(user.getUsername());
         response.setMobile(user.getMobile());
         response.setNickname(user.getNickname());
         response.setAvatar(user.getAvatar());
         response.setLastSeenAt(user.getLastSeenAt());
+        response.setOwner(Objects.equals(user.getId(), owner.getId()));
         return response;
     }
 }

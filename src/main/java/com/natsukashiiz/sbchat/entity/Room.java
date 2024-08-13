@@ -4,8 +4,6 @@ import com.natsukashiiz.sbchat.common.RoomType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +12,7 @@ import java.util.List;
 @Setter
 @Entity
 @Table(name = "rooms")
-@SQLRestriction("deleted_at IS NULL")
+//@SQLRestriction("deleted_at IS NULL")
 public class Room extends BaseEntity {
 
     @Enumerated(EnumType.STRING)

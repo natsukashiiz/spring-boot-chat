@@ -16,8 +16,8 @@ import java.util.List;
 public class RoomResponse implements Serializable {
     private Long id;
     private RoomType type;
-    private UserResponse owner;
     private String name;
     private String image;
-    private List<UserResponse> members = new ArrayList<>();
+    private List<MemberGroupResponse> members = new ArrayList<>();
+    private UserResponse friend;
 }

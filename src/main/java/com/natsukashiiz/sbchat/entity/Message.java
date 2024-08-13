@@ -10,7 +10,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Setter
 @Entity
 @Table(name = "messages")
-@SQLRestriction("deleted_at IS NULL")
+//@SQLRestriction("deleted_at IS NULL")
 public class Message extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
