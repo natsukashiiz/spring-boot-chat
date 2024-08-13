@@ -1,6 +1,7 @@
 package com.natsukashiiz.sbchat.service;
 
 import com.natsukashiiz.sbchat.common.RoomType;
+import com.natsukashiiz.sbchat.entity.Inbox;
 import com.natsukashiiz.sbchat.entity.Room;
 import com.natsukashiiz.sbchat.entity.RoomMember;
 import com.natsukashiiz.sbchat.entity.User;
@@ -12,7 +13,7 @@ import com.natsukashiiz.sbchat.model.request.UpdateGroupRequest;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.MemberGroupResponse;
 import com.natsukashiiz.sbchat.model.response.RoomResponse;
-import com.natsukashiiz.sbchat.model.response.UserResponse;
+import com.natsukashiiz.sbchat.repository.InboxRepository;
 import com.natsukashiiz.sbchat.repository.RoomMemberRepository;
 import com.natsukashiiz.sbchat.repository.RoomRepository;
 import com.natsukashiiz.sbchat.repository.UserRepository;
@@ -35,6 +36,7 @@ public class GroupService {
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
     private final RoomMemberRepository roomMemberRepository;
+    private final InboxRepository inboxRepository;
 
     public ApiResponse<List<RoomResponse>> getGroups() throws BaseException {
         var user = authService.getUser();
@@ -76,6 +78,12 @@ public class GroupService {
         selfRoomMember.setMuted(false);
         roomEntity.getMembers().add(selfRoomMember);
 
+        var selfInbox = new Inbox();
+        selfInbox.setUser(user);
+        selfInbox.setRoom(roomEntity);
+        selfInbox.setUnreadCount(1);
+        // continue code
+
         for (var userId : request.getMemberIds()) {
             if (Objects.equals(userId, user.getId())) {
                 continue;
@@ -92,6 +100,8 @@ public class GroupService {
             otherRoomMember.setUser(member);
             otherRoomMember.setMuted(false);
             roomEntity.getMembers().add(otherRoomMember);
+
+            // TODO: Update Inbox Last Message
         }
 
         roomRepository.save(roomEntity);
