@@ -7,8 +7,7 @@ import lombok.ToString;
 @Setter
 @Getter
 @ToString
-public class UpdateGroupRequest {
+public class UpdateGroupPhotoRequest {
 
-    private String name;
-    private String image;
+    private String photo;
 }

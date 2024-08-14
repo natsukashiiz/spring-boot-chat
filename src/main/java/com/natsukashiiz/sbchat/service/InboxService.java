@@ -2,6 +2,7 @@ package com.natsukashiiz.sbchat.service;
 
 import com.natsukashiiz.sbchat.common.RoomType;
 import com.natsukashiiz.sbchat.entity.Inbox;
+import com.natsukashiiz.sbchat.entity.Message;
 import com.natsukashiiz.sbchat.entity.User;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.model.response.*;
@@ -35,7 +36,6 @@ public class InboxService {
 
     private InboxResponse createInboxResponse(Inbox inbox) {
         var room = inbox.getRoom();
-        var lastMessage = inbox.getLastMessage();
         var unreadCount = inbox.getUnreadCount();
 
         var roomResponse = new RoomResponse();
@@ -57,19 +57,22 @@ public class InboxService {
                     .toList());
         }
 
-        var lastMessageResponse = new MessageResponse();
-        lastMessageResponse.setId(lastMessage.getId());
-        lastMessageResponse.setType(lastMessage.getType());
-        lastMessageResponse.setContent(lastMessage.getContent());
-
-        var sender = lastMessage.getSender();
-        var senderResponse = createUserResponse(sender);
-        lastMessageResponse.setSender(senderResponse);
-
         var response = new InboxResponse();
         response.setId(inbox.getId());
         response.setUnreadCount(unreadCount);
-        response.setLastMessage(lastMessageResponse);
+
+        if (Objects.nonNull(inbox.getLastMessage())) {
+            var lastMessage = inbox.getLastMessage();
+            var lastMessageResponse = createMessageResponse(lastMessage);
+
+            if (Objects.nonNull(lastMessage.getReplyTo())) {
+                var replyToResponse = createMessageResponse(lastMessage.getReplyTo());
+                lastMessageResponse.setReplyTo(replyToResponse);
+            }
+
+            response.setLastMessage(lastMessageResponse);
+        }
+
         response.setRoom(roomResponse);
 
         return response;
@@ -95,6 +98,20 @@ public class InboxService {
         response.setAvatar(user.getAvatar());
         response.setLastSeenAt(user.getLastSeenAt());
         response.setOwner(Objects.equals(user.getId(), owner.getId()));
+        return response;
+    }
+
+    private MessageResponse createMessageResponse(Message message) {
+        var sender = message.getSender();
+        var senderResponse = createUserResponse(sender);
+
+        var response = new MessageResponse();
+        response.setId(message.getId());
+        response.setAction(message.getAction());
+        response.setType(message.getType());
+        response.setContent(message.getContent());
+        response.setSender(senderResponse);
+        response.setCreatedAt(message.getCreatedAt());
         return response;
     }
 }

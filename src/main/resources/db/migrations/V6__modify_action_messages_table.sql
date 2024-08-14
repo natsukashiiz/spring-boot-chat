@@ -1,0 +1,1 @@
+ALTER TABLE `messages` MODIFY COLUMN `action` ENUM ('SendMessage', 'ReplyMessage', 'EditMessage', 'JoinChat', 'LeaveChat', 'BlockUser', 'UnblockUser', 'CreateGroupChat', 'RenameGroupChat', 'ChangeGroupChatPhoto', 'RemoveGroupMember', 'AddGroupMember') NULL AFTER `content`;

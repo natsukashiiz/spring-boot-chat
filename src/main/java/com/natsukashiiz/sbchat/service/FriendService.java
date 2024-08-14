@@ -173,32 +173,14 @@ public class FriendService {
             roomMemberRepository.save(friendRoomMemberEntity);
         }
 
-        var selfMessageEntity = new Message();
-        selfMessageEntity.setRoom(roomEntity);
-        selfMessageEntity.setSender(selfUser);
-        selfMessageEntity.setType(MessageType.Join);
-        selfMessageEntity.setContent("You are now friends");
-        messageRepository.save(selfMessageEntity);
-
         var selfInboxEntity = inboxRepository.findByRoomIdAndUserId(roomEntity.getId(), selfUser.getId()).orElse(new Inbox());
         selfInboxEntity.setRoom(roomEntity);
         selfInboxEntity.setUser(selfUser);
-        selfInboxEntity.setLastMessage(selfMessageEntity);
-        selfInboxEntity.setUnreadCount(1);
         inboxRepository.save(selfInboxEntity);
-
-        var friendMessageEntity = new Message();
-        friendMessageEntity.setRoom(roomEntity);
-        friendMessageEntity.setSender(friendUser);
-        friendMessageEntity.setType(MessageType.Join);
-        friendMessageEntity.setContent("You are now friends");
-        messageRepository.save(friendMessageEntity);
 
         var friendInboxEntity = inboxRepository.findByRoomIdAndUserId(roomEntity.getId(), friendUser.getId()).orElse(new Inbox());
         friendInboxEntity.setRoom(roomEntity);
         friendInboxEntity.setUser(friendUser);
-        friendInboxEntity.setLastMessage(friendMessageEntity);
-        friendInboxEntity.setUnreadCount(1);
         inboxRepository.save(friendInboxEntity);
 
         friend.setStatus(FriendStatus.Friend);

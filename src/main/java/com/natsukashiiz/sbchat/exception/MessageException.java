@@ -13,4 +13,16 @@ public class MessageException extends BaseException {
     public static BaseException notFriend() {
         return new MessageException("not.friend");
     }
+
+    public static BaseException notFound() {
+        return new MessageException("not.found");
+    }
+
+    public static BaseException notFoundRoom() {
+        return new MessageException("not.found.room");
+    }
+
+    public static BaseException notFoundInbox() {
+        return new MessageException("not.found.inbox");
+    }
 }

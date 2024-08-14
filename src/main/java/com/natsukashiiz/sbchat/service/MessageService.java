@@ -1,17 +1,18 @@
 package com.natsukashiiz.sbchat.service;
 
 import com.natsukashiiz.sbchat.common.FriendStatus;
+import com.natsukashiiz.sbchat.common.MessageAction;
+import com.natsukashiiz.sbchat.common.Pagination;
 import com.natsukashiiz.sbchat.common.RoomType;
+import com.natsukashiiz.sbchat.entity.Inbox;
 import com.natsukashiiz.sbchat.entity.Message;
 import com.natsukashiiz.sbchat.entity.Room;
 import com.natsukashiiz.sbchat.entity.User;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.exception.MessageException;
+import com.natsukashiiz.sbchat.model.request.ReplyMessageRequest;
 import com.natsukashiiz.sbchat.model.request.SendMessageRequest;
-import com.natsukashiiz.sbchat.model.response.ApiResponse;
-import com.natsukashiiz.sbchat.model.response.MessageResponse;
-import com.natsukashiiz.sbchat.model.response.RoomResponse;
-import com.natsukashiiz.sbchat.model.response.UserResponse;
+import com.natsukashiiz.sbchat.model.response.*;
 import com.natsukashiiz.sbchat.repository.FriendRepository;
 import com.natsukashiiz.sbchat.repository.InboxRepository;
 import com.natsukashiiz.sbchat.repository.MessageRepository;
@@ -22,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -37,7 +37,7 @@ public class MessageService {
     private final InboxRepository inboxRepository;
     private final FriendRepository friendRepository;
 
-    public ApiResponse<List<MessageResponse>> getMessages(Long roomId) throws BaseException {
+    public ApiResponse<RoomResponse> getMessages(Long roomId, Pagination pagination) throws BaseException {
         var user = authService.getUser();
 
         var roomMember = roomMemberRepository.findByRoomIdAndUserId(roomId, user.getId())
@@ -46,14 +46,19 @@ public class MessageService {
                     return MessageException.notMember();
                 });
 
-        var room = roomMember.getRoom();
+        readAllMessages(roomId, user.getId());
 
-        var responses = room.getMessages()
-                .stream()
-                .map(this::createMessageResponse)
-                .toList();
+        var inbox = inboxRepository.findByRoomIdAndUserId(roomId, user.getId()).get();
+        var messagesPage = messageRepository.findAllByRoomIdOrderByCreatedAtDesc(roomId, pagination);
+        var responses = createRoomResponse(
+                roomMember.getRoom(),
+                user.getId(),
+                messagesPage.getContent(),
+                messagesPage.getTotalElements(),
+                inbox.getUnreadCount()
+        );
 
-        return ResponseUtils.successList(responses);
+        return ResponseUtils.success(responses);
     }
 
     @Transactional
@@ -94,9 +99,9 @@ public class MessageService {
         var message = new Message();
         message.setRoom(room);
         message.setSender(user);
+        message.setAction(MessageAction.SendMessage);
         message.setType(request.getType());
         message.setContent(request.getContent());
-        message.setCreatedAt(LocalDateTime.now());
         messageRepository.save(message);
 
         var inboxOfMembers = inboxRepository.findAllByRoomId(roomId);
@@ -110,30 +115,95 @@ public class MessageService {
             inboxRepository.save(inbox);
         }
 
-        // ส่งข้อความไปยังห้องที่กำหนด
+        // TODO:: ส่งข้อความไปยังห้องที่กำหนด
+
+        readAllMessages(roomId, user.getId());
 
         var response = createMessageResponse(message);
         return ResponseUtils.success(response);
     }
 
+    public ApiResponse<MessageResponse> replyMessage(Long roomId, ReplyMessageRequest request) throws BaseException {
+        var user = authService.getUser();
+
+        var roomMember = roomMemberRepository.findByRoomIdAndUserId(roomId, user.getId())
+                .orElseThrow(() -> {
+                    log.warn("ReplyMessage-[block]:(not member). userId:{}, roomId:{}, request:{}", user.getId(), roomId, request);
+                    return MessageException.notMember();
+                });
+
+        var room = roomMember.getRoom();
+
+        var replyTo = messageRepository.findById(request.getReplyToId())
+                .orElseThrow(() -> {
+                    log.warn("ReplyMessage-[block]:(not found). userId:{}, roomId:{}, request:{}", user.getId(), roomId, request);
+                    return MessageException.notFound();
+                });
+
+        var message = new Message();
+        message.setRoom(room);
+        message.setSender(user);
+        message.setAction(MessageAction.ReplyMessage);
+        message.setType(request.getType());
+        message.setContent(request.getContent());
+        message.setReplyTo(replyTo);
+        messageRepository.save(message);
+
+        var inboxOfMembers = inboxRepository.findAllByRoomId(roomId);
+        for (var inbox : inboxOfMembers) {
+            if (!Objects.equals(user.getId(), inbox.getUser().getId())) {
+                inbox.setUnreadCount(inbox.getUnreadCount() + 1);
+            }
+
+            inbox.setLastMessage(message);
+            inboxRepository.save(inbox);
+        }
+
+        // TODO:: ส่งข้อความไปยังห้องที่กำหนด
+
+        readAllMessages(roomId, user.getId());
+
+        var response = createMessageResponse(message);
+        return ResponseUtils.success(response);
+    }
+
+    public ApiResponse<Object> readAllMessages(Long roomId, Long userId) throws BaseException {
+        var inbox = inboxRepository.findByRoomIdAndUserId(roomId, userId)
+                .orElseThrow(() -> {
+                    log.warn("ReadAllMessages-[block]:(not found inbox). userId:{}, roomId:{}.", userId, roomId);
+                    return MessageException.notFound();
+                });
+
+        inbox.setUnreadCount(0);
+        inboxRepository.save(inbox);
+
+        return ResponseUtils.success();
+    }
+
     private MessageResponse createMessageResponse(Message message) {
-        var room = message.getRoom();
-        var sender = message.getSender();
-
-        var roomResponse = createRoomResponse(room, sender.getId());
-        var senderResponse = createUserResponse(sender);
-
         var response = new MessageResponse();
         response.setId(message.getId());
+        response.setAction(message.getAction());
         response.setType(message.getType());
         response.setContent(message.getContent());
-        response.setRoom(roomResponse);
-        response.setSender(senderResponse);
         response.setCreatedAt(message.getCreatedAt());
+
+        if (Objects.nonNull(message.getSender())) {
+            response.setSender(createUserResponse(message.getSender()));
+        }
+
+        if (Objects.nonNull(message.getMention())) {
+            response.setMention(createUserResponse(message.getMention()));
+        }
+
+        if (Objects.nonNull(message.getReplyTo())) {
+            response.setReplyTo(createMessageResponse(message.getReplyTo()));
+        }
+
         return response;
     }
 
-    private RoomResponse createRoomResponse(Room room, Long senderId) {
+    private RoomResponse createRoomResponse(Room room, Long senderId, List<Message> messages, Long messageCount, Integer unreadCount) {
         var response = new RoomResponse();
         response.setId(room.getId());
         response.setType(room.getType());
@@ -149,7 +219,20 @@ public class MessageService {
         } else {
             response.setName(room.getName());
             response.setImage(room.getImage());
+
+            var members = room.getMembers()
+                    .stream()
+                    .map(member -> createMemberResponse(member.getUser(), room.getOwner()))
+                    .sorted((a, b) -> Boolean.compare(b.isOwner(), a.isOwner()))
+                    .toList();
+            response.setMembers(members);
         }
+
+        response.setMessages(messages.stream()
+                .map(this::createMessageResponse)
+                .toList());
+        response.setMessageCount(messageCount);
+        response.setUnreadCount(unreadCount);
 
         return response;
     }
@@ -162,6 +245,18 @@ public class MessageService {
         response.setNickname(user.getNickname());
         response.setAvatar(user.getAvatar());
         response.setLastSeenAt(user.getLastSeenAt());
+        return response;
+    }
+
+    private MemberGroupResponse createMemberResponse(User user, User owner) {
+        var response = new MemberGroupResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setMobile(user.getMobile());
+        response.setNickname(user.getNickname());
+        response.setAvatar(user.getAvatar());
+        response.setLastSeenAt(user.getLastSeenAt());
+        response.setOwner(Objects.equals(user.getId(), owner.getId()));
         return response;
     }
 }

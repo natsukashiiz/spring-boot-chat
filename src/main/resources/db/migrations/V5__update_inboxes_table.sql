@@ -1,0 +1,1 @@
+ALTER TABLE `inboxes` MODIFY COLUMN `last_message_id` BIGINT UNSIGNED NULL;

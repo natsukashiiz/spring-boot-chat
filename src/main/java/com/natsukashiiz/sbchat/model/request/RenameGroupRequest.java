@@ -4,14 +4,10 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.util.Set;
-
 @Setter
 @Getter
 @ToString
-public class CreateGroupRequest {
+public class RenameGroupRequest {
 
     private String name;
-    private String image;
-    private Set<Long> memberIds;
 }

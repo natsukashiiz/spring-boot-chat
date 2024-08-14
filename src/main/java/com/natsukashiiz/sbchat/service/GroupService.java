@@ -1,22 +1,18 @@
 package com.natsukashiiz.sbchat.service;
 
+import com.natsukashiiz.sbchat.common.MessageAction;
 import com.natsukashiiz.sbchat.common.RoomType;
-import com.natsukashiiz.sbchat.entity.Inbox;
-import com.natsukashiiz.sbchat.entity.Room;
-import com.natsukashiiz.sbchat.entity.RoomMember;
-import com.natsukashiiz.sbchat.entity.User;
+import com.natsukashiiz.sbchat.entity.*;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.exception.GroupException;
 import com.natsukashiiz.sbchat.model.request.AddMembersGroupRequest;
+import com.natsukashiiz.sbchat.model.request.UpdateGroupPhotoRequest;
 import com.natsukashiiz.sbchat.model.request.CreateGroupRequest;
-import com.natsukashiiz.sbchat.model.request.UpdateGroupRequest;
+import com.natsukashiiz.sbchat.model.request.RenameGroupRequest;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.MemberGroupResponse;
 import com.natsukashiiz.sbchat.model.response.RoomResponse;
-import com.natsukashiiz.sbchat.repository.InboxRepository;
-import com.natsukashiiz.sbchat.repository.RoomMemberRepository;
-import com.natsukashiiz.sbchat.repository.RoomRepository;
-import com.natsukashiiz.sbchat.repository.UserRepository;
+import com.natsukashiiz.sbchat.repository.*;
 import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +33,7 @@ public class GroupService {
     private final UserRepository userRepository;
     private final RoomMemberRepository roomMemberRepository;
     private final InboxRepository inboxRepository;
+    private final MessageRepository messageRepository;
 
     public ApiResponse<List<RoomResponse>> getGroups() throws BaseException {
         var user = authService.getUser();
@@ -58,6 +55,7 @@ public class GroupService {
         return ResponseUtils.success(response);
     }
 
+    @Transactional
     public ApiResponse<RoomResponse> createGroup(CreateGroupRequest request) throws BaseException {
         var user = authService.getUser();
 
@@ -71,23 +69,16 @@ public class GroupService {
         roomEntity.setType(RoomType.Group);
         roomEntity.setName(request.getName());
         roomEntity.setImage(request.getImage());
+        roomRepository.save(roomEntity);
 
-        var selfRoomMember = new RoomMember();
-        selfRoomMember.setRoom(roomEntity);
-        selfRoomMember.setUser(user);
-        selfRoomMember.setMuted(false);
-        roomEntity.getMembers().add(selfRoomMember);
+        var lastMessage = new Message();
+        lastMessage.setSender(user);
+        lastMessage.setRoom(roomEntity);
+        lastMessage.setAction(MessageAction.CreateGroupChat);
+        messageRepository.save(lastMessage);
 
-        var selfInbox = new Inbox();
-        selfInbox.setUser(user);
-        selfInbox.setRoom(roomEntity);
-        selfInbox.setUnreadCount(1);
-        // continue code
-
+        request.getMemberIds().add(user.getId());
         for (var userId : request.getMemberIds()) {
-            if (Objects.equals(userId, user.getId())) {
-                continue;
-            }
 
             var member = userRepository.findById(userId)
                     .orElseThrow(() -> {
@@ -99,37 +90,75 @@ public class GroupService {
             otherRoomMember.setRoom(roomEntity);
             otherRoomMember.setUser(member);
             otherRoomMember.setMuted(false);
-            roomEntity.getMembers().add(otherRoomMember);
+//            roomEntity.getMembers().add(otherRoomMember);
+            roomMemberRepository.save(otherRoomMember);
 
-            // TODO: Update Inbox Last Message
+            var otherInbox = new Inbox();
+            otherInbox.setUser(member);
+            otherInbox.setRoom(roomEntity);
+            otherInbox.setLastMessage(lastMessage);
+            otherInbox.setUnreadCount(1);
+            inboxRepository.save(otherInbox);
         }
 
-        roomRepository.save(roomEntity);
         var response = createGroupRoomResponse(roomEntity);
         return ResponseUtils.success(response);
     }
 
-    public ApiResponse<RoomResponse> updateGroup(Long roomId, UpdateGroupRequest request) throws BaseException {
+    public ApiResponse<RoomResponse> updateGroupName(Long roomId, RenameGroupRequest request) throws BaseException {
         var user = authService.getUser();
         var room = roomRepository.findByIdAndMembersUserId(roomId, user.getId())
                 .orElseThrow(() -> {
-                    log.warn("UpdateGroup-[block]:(room not found). userId:{}, roomId:{}", user.getId(), roomId);
+                    log.warn("UpdateGroupName-[block]:(room not found). userId:{}, roomId:{}", user.getId(), roomId);
                     return GroupException.notFound();
                 });
 
         if (!Objects.equals(user.getId(), room.getOwner().getId())) {
-            log.warn("UpdateGroup-[block]:(not permission). userId:{}, roomId:{}", user.getId(), roomId);
+            log.warn("UpdateGroupName-[block]:(not permission). userId:{}, roomId:{}", user.getId(), roomId);
             throw GroupException.notPermission();
         }
 
         if (!StringUtils.hasText(request.getName())) {
-            log.warn("UpdateGroup-[block]:(invalid name). userId:{}, request:{}", user.getId(), request);
+            log.warn("UpdateGroupName-[block]:(invalid name). userId:{}, request:{}", user.getId(), request);
             throw GroupException.nameInvalid();
         }
 
         room.setName(request.getName());
-        room.setImage(request.getImage());
         roomRepository.save(room);
+
+        var message = new Message();
+        message.setAction(MessageAction.RenameGroupChat);
+        message.setRoom(room);
+        message.setSender(user);
+        message.setContent(request.getName());
+        messageRepository.save(message);
+
+        var response = createGroupRoomResponse(room);
+        return ResponseUtils.success(response);
+    }
+
+    public ApiResponse<RoomResponse> updateGroupPhoto(Long roomId, UpdateGroupPhotoRequest request) throws BaseException {
+        var user = authService.getUser();
+        var room = roomRepository.findByIdAndMembersUserId(roomId, user.getId())
+                .orElseThrow(() -> {
+                    log.warn("UpdateGroupPhoto-[block]:(room not found). userId:{}, roomId:{}", user.getId(), roomId);
+                    return GroupException.notFound();
+                });
+
+        if (!Objects.equals(user.getId(), room.getOwner().getId())) {
+            log.warn("UpdateGroupPhoto-[block]:(not permission). userId:{}, roomId:{}", user.getId(), roomId);
+            throw GroupException.notPermission();
+        }
+
+        room.setImage(request.getPhoto());
+        roomRepository.save(room);
+
+        var message = new Message();
+        message.setAction(MessageAction.ChangeGroupChatPhoto);
+        message.setRoom(room);
+        message.setSender(user);
+        message.setContent(request.getPhoto());
+        messageRepository.save(message);
 
         var response = createGroupRoomResponse(room);
         return ResponseUtils.success(response);
@@ -160,9 +189,16 @@ public class GroupService {
             roomMember.setUser(member);
             roomMember.setMuted(false);
             room.getMembers().add(roomMember);
+            roomMemberRepository.save(roomMember);
+
+            var message = new Message();
+            message.setAction(MessageAction.AddGroupMember);
+            message.setRoom(room);
+            message.setSender(user);
+            message.setMention(member);
+            messageRepository.save(message);
         }
 
-        roomRepository.save(room);
         var response = createGroupRoomResponse(room);
         return ResponseUtils.success(response);
     }
@@ -191,6 +227,13 @@ public class GroupService {
 
         room.getMembers().remove(member);
         roomMemberRepository.softDeleteByRoomIdAndUserId(roomId, memberId);
+
+        var message = new Message();
+        message.setAction(MessageAction.RemoveGroupMember);
+        message.setRoom(room);
+        message.setSender(user);
+        message.setMention(member.getUser());
+        messageRepository.save(message);
 
         var response = createGroupRoomResponse(room);
         return ResponseUtils.success(response);
