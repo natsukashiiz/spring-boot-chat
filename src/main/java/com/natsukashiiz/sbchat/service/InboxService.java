@@ -51,6 +51,8 @@ public class InboxService {
                     .findFirst()
                     .orElseThrow();
             roomResponse.setFriend(createUserResponse(friend.getUser()));
+            roomResponse.setName(friend.getUser().getNickname());
+            roomResponse.setImage(friend.getUser().getAvatar());
         } else {
             roomResponse.setMembers(members.stream()
                     .map(m -> createMemberResponse(m.getUser(), room.getOwner()))
