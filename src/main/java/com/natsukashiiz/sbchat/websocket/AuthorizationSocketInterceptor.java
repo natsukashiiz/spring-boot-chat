@@ -11,10 +11,10 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-import java.nio.file.AccessDeniedException;
 import java.util.Objects;
 
 @Log4j2
@@ -28,16 +28,18 @@ public class AuthorizationSocketInterceptor implements ChannelInterceptor {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (Objects.nonNull(accessor) && StompCommand.CONNECT.equals(accessor.getCommand())) {
             var authHeader = accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION);
-            if (Objects.isNull(accessor) || !authHeader.startsWith("Bearer ")) {
-                throw new AccessDeniedException("Missing or invalid token");
+            if (Objects.isNull(authHeader) || !authHeader.startsWith("Bearer ")) {
+                throw new AuthenticationCredentialsNotFoundException("Missing or invalid token");
             }
+
             var token = authHeader.substring(7);
             Jwt jwt;
+
             try {
                 jwt = tokenService.decode(token);
             } catch (Exception e) {
                 log.warn(e.getMessage());
-                throw new AccessDeniedException("Invalid token");
+                throw new AuthenticationCredentialsNotFoundException("Invalid token");
             }
 
             JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt);
