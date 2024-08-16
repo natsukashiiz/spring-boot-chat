@@ -4,7 +4,6 @@ import com.natsukashiiz.sbchat.common.FriendStatus;
 import com.natsukashiiz.sbchat.common.MessageAction;
 import com.natsukashiiz.sbchat.common.Pagination;
 import com.natsukashiiz.sbchat.common.RoomType;
-import com.natsukashiiz.sbchat.entity.Inbox;
 import com.natsukashiiz.sbchat.entity.Message;
 import com.natsukashiiz.sbchat.entity.Room;
 import com.natsukashiiz.sbchat.entity.User;
@@ -21,6 +20,7 @@ import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -36,6 +36,7 @@ public class MessageService {
     private final RoomMemberRepository roomMemberRepository;
     private final InboxRepository inboxRepository;
     private final FriendRepository friendRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ApiResponse<RoomResponse> getMessages(Long roomId, Pagination pagination) throws BaseException {
         var user = authService.getUser();
@@ -116,6 +117,20 @@ public class MessageService {
         }
 
         // TODO:: ส่งข้อความไปยังห้องที่กำหนด
+        if (room.getType() == RoomType.Friend) {
+            var friendId = room.getMembers().stream()
+                    .filter(member -> !member.getUser().getId().equals(user.getId()))
+                    .map(member -> member.getUser().getId())
+                    .findFirst()
+                    .orElseThrow();
+
+            log.info("SendMessage:[send message]. userId:{}, friendId:{}, message:{}", user.getId(), friendId, message);
+            var response = createMessageResponse(message);
+            var roomResponse = new RoomResponse();
+            roomResponse.setId(room.getId());
+            response.setRoom(roomResponse);
+            messagingTemplate.convertAndSendToUser(friendId.toString(), "/topic/messages", response);
+        }
 
         readAllMessages(roomId, user.getId());
 
