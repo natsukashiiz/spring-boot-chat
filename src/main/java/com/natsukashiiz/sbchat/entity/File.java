@@ -1,10 +1,7 @@
 package com.natsukashiiz.sbchat.entity;
 
 import com.natsukashiiz.sbchat.common.FileType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -16,7 +13,13 @@ import lombok.ToString;
 public class File extends BaseEntity {
 
     @ManyToOne
-    private User user;
+    private User owner;
+
+    @ManyToOne
+    private Room room;
+
+    @OneToOne
+    private Message message;
 
     @Enumerated(EnumType.STRING)
     private FileType type;
@@ -27,5 +30,4 @@ public class File extends BaseEntity {
     private String format;
     private String contentType;
     private Long size;
-    private Boolean isPublic;
 }

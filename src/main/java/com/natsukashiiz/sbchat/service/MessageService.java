@@ -116,28 +116,26 @@ public class MessageService {
             inboxRepository.save(inbox);
         }
 
-        // TODO:: ส่งข้อความไปยังห้องที่กำหนด
-        if (room.getType() == RoomType.Friend) {
-            var friendId = room.getMembers().stream()
-                    .filter(member -> !member.getUser().getId().equals(user.getId()))
-                    .map(member -> member.getUser().getId())
-                    .findFirst()
-                    .orElseThrow();
+        var response = createMessageResponse(message);
+        var roomResponse = new RoomResponse();
+        roomResponse.setId(room.getId());
+        response.setRoom(roomResponse);
 
-            log.info("SendMessage:[send message]. userId:{}, friendId:{}, message:{}", user.getId(), friendId, message);
-            var response = createMessageResponse(message);
-            var roomResponse = new RoomResponse();
-            roomResponse.setId(room.getId());
-            response.setRoom(roomResponse);
-            messagingTemplate.convertAndSendToUser(friendId.toString(), "/topic/messages", response);
+        // ส่งข้อความไปยังห้องที่กำหนด
+        for (var member : room.getMembers()) {
+            if (Objects.equals(member.getUser().getId(), user.getId())) {
+                continue;
+            }
+
+            log.info("SendMessage:[next]. userId:{}, memberId:{}, message:{}", user.getId(), member.getUser().getId(), message);
+            messagingTemplate.convertAndSendToUser(member.getUser().getId().toString(), "/topic/messages", response);
         }
 
         readAllMessages(roomId, user.getId());
-
-        var response = createMessageResponse(message);
         return ResponseUtils.success(response);
     }
 
+    @Transactional
     public ApiResponse<MessageResponse> replyMessage(Long roomId, ReplyMessageRequest request) throws BaseException {
         var user = authService.getUser();
 
@@ -174,11 +172,22 @@ public class MessageService {
             inboxRepository.save(inbox);
         }
 
-        // TODO:: ส่งข้อความไปยังห้องที่กำหนด
+        var response = createMessageResponse(message);
+        var roomResponse = new RoomResponse();
+        roomResponse.setId(room.getId());
+        response.setRoom(roomResponse);
+
+        // ส่งข้อความไปยังห้องที่กำหนด
+        for (var member : room.getMembers()) {
+            if (Objects.equals(member.getUser().getId(), user.getId())) {
+                continue;
+            }
+
+            log.info("ReplyMessage:[next]. userId:{}, memberId:{}, message:{}", user.getId(), member.getUser().getId(), message);
+            messagingTemplate.convertAndSendToUser(member.getUser().getId().toString(), "/topic/messages", response);
+        }
 
         readAllMessages(roomId, user.getId());
-
-        var response = createMessageResponse(message);
         return ResponseUtils.success(response);
     }
 

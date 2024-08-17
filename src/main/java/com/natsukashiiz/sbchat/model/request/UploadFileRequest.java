@@ -13,6 +13,4 @@ public class UploadFileRequest {
 
     @NotNull
     private MultipartFile file;
-
-    private boolean isPublic = true;
 }

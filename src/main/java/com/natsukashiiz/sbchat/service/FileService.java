@@ -84,7 +84,7 @@ public class FileService {
             var fileType = getFileType(file.getContentType());
 
             var fileEntity = new File();
-            fileEntity.setUser(user);
+            fileEntity.setOwner(user);
             fileEntity.setName(newFileName);
             fileEntity.setPath(destinationFile.toString());
             fileEntity.setUrl(url);
@@ -92,8 +92,6 @@ public class FileService {
             fileEntity.setContentType(file.getContentType());
             fileEntity.setSize(file.getSize());
             fileEntity.setFormat(format);
-            fileEntity.setIsPublic(request.isPublic());
-            fileEntity.setDeletedAt(null);
             fileRepository.save(fileEntity);
 
             var response = new UploadFileResponse();
@@ -184,7 +182,7 @@ public class FileService {
         }
 
         var file = fileOptional.get();
-        if (!Objects.equals(file.getUser().getId(), user.getId())) {
+        if (!Objects.equals(file.getOwner().getId(), user.getId())) {
             log.warn("deleteByUrl-[block]:(file not belong to user). userId:{}, url:{}.", user.getId(), url);
             throw FileException.notFound();
         }
