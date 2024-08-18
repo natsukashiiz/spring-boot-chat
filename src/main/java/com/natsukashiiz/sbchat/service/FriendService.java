@@ -1,7 +1,6 @@
 package com.natsukashiiz.sbchat.service;
 
 import com.natsukashiiz.sbchat.common.FriendStatus;
-import com.natsukashiiz.sbchat.common.MessageType;
 import com.natsukashiiz.sbchat.common.RoomType;
 import com.natsukashiiz.sbchat.entity.*;
 import com.natsukashiiz.sbchat.exception.BaseException;
@@ -13,6 +12,7 @@ import com.natsukashiiz.sbchat.repository.*;
 import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +31,7 @@ public class FriendService {
     private final RoomRepository roomRepository;
     private final RoomMemberRepository roomMemberRepository;
     private final MessageRepository messageRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ApiResponse<List<FriendResponse>> getFriends(FriendStatus status) throws BaseException {
         var user = authService.getUser();
@@ -54,9 +55,22 @@ public class FriendService {
             return FriendException.notFound();
         });
 
-        var selfFriend = friendRepository.findByUserIdAndFriendId(user.getId(), friend.getId()).orElse(new Friend());
-        var response = createFriendResponse(friend, selfFriend.getStatus());
-        return ResponseUtils.success(response);
+        var selfFriendOptional = friendRepository.findByUserIdAndFriendId(user.getId(), friend.getId());
+        if (selfFriendOptional.isPresent()) {
+            var selfFriend = selfFriendOptional.get();
+            var response = createFriendResponse(friend, selfFriend.getStatus());
+            return ResponseUtils.success(response);
+        } else {
+            var friendSelfOptional = friendRepository.findByUserIdAndFriendId(friend.getId(), user.getId());
+            if (friendSelfOptional.isPresent()) {
+                var friendSelf = friendSelfOptional.get();
+                var response = createFriendResponse(friend, friendSelf.getStatus());
+                return ResponseUtils.success(response);
+            } else {
+                var response = createFriendResponse(friend, null);
+                return ResponseUtils.success(response);
+            }
+        }
     }
 
     @Transactional
@@ -92,6 +106,11 @@ public class FriendService {
         applyFriendEntity.setFriend(friend);
         applyFriendEntity.setStatus(FriendStatus.Apply);
         friendRepository.save(applyFriendEntity);
+
+        {
+            var response = createFriendResponse(applyFriendEntity.getUser(), applyFriendEntity.getStatus());
+            messagingTemplate.convertAndSendToUser(friend.getId().toString(), "/topic/friends", response);
+        }
 
         var response = createFriendResponse(applyFriendEntity.getFriend(), applyFriendEntity.getStatus());
 
