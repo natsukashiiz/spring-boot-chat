@@ -2,9 +2,9 @@ package com.natsukashiiz.sbchat.controller;
 
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.model.request.AddMembersGroupRequest;
-import com.natsukashiiz.sbchat.model.request.UpdateGroupPhotoRequest;
 import com.natsukashiiz.sbchat.model.request.CreateGroupRequest;
 import com.natsukashiiz.sbchat.model.request.RenameGroupRequest;
+import com.natsukashiiz.sbchat.model.request.UpdateGroupPhotoRequest;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.RoomResponse;
 import com.natsukashiiz.sbchat.service.GroupService;
@@ -52,7 +52,7 @@ public class GroupController {
         return groupService.addGroupMember(roomId, request);
     }
 
-    @PostMapping("/{roomId}/members/{userId}/kick")
+    @DeleteMapping("/{roomId}/members/{userId}")
     public ApiResponse<RoomResponse> kickGroupMember(@PathVariable Long roomId, @PathVariable Long userId) throws BaseException {
         return groupService.kickGroupMember(roomId, userId);
     }

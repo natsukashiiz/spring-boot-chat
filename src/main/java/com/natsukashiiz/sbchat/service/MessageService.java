@@ -12,10 +12,7 @@ import com.natsukashiiz.sbchat.exception.MessageException;
 import com.natsukashiiz.sbchat.model.request.ReplyMessageRequest;
 import com.natsukashiiz.sbchat.model.request.SendMessageRequest;
 import com.natsukashiiz.sbchat.model.response.*;
-import com.natsukashiiz.sbchat.repository.FriendRepository;
-import com.natsukashiiz.sbchat.repository.InboxRepository;
-import com.natsukashiiz.sbchat.repository.MessageRepository;
-import com.natsukashiiz.sbchat.repository.RoomMemberRepository;
+import com.natsukashiiz.sbchat.repository.*;
 import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +20,7 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Objects;
 
@@ -37,6 +35,7 @@ public class MessageService {
     private final InboxRepository inboxRepository;
     private final FriendRepository friendRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepository userRepository;
 
     public ApiResponse<RoomResponse> getMessages(Long roomId, Pagination pagination) throws BaseException {
         var user = authService.getUser();
@@ -202,6 +201,31 @@ public class MessageService {
         inboxRepository.save(inbox);
 
         return ResponseUtils.success();
+    }
+
+    @Transactional
+    public void typingMessage(TypingMessage typingMessage, Principal principal) throws BaseException {
+        var user = userRepository.findById(Long.parseLong(principal.getName()))
+                .orElseThrow(() -> {
+                    log.warn("TypingMessage-[block]:(not found). username:{}.", principal.getName());
+                    return MessageException.notFound();
+                });
+
+        var roomMember = roomMemberRepository.findByRoomIdAndUserId(typingMessage.getRoomId(), user.getId())
+                .orElseThrow(() -> {
+                    log.warn("TypingMessage-[block]:(not member). userId:{}, roomId:{}.", user.getId(), typingMessage.getRoomId());
+                    return MessageException.notMember();
+                });
+
+        typingMessage.setUser(createUserResponse(user));
+        var room = roomMember.getRoom();
+        for (var member : room.getMembers()) {
+            if (Objects.equals(member.getUser().getId(), user.getId())) {
+                continue;
+            }
+            log.info("TypingMessage:[next]. userId:{}, memberId:{}, message:{}", user.getId(), member.getUser().getId(), typingMessage);
+            messagingTemplate.convertAndSendToUser(member.getUser().getId().toString(), "/topic/typing", typingMessage);
+        }
     }
 
     private MessageResponse createMessageResponse(Message message) {
