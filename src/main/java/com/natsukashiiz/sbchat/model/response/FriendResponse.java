@@ -13,6 +13,6 @@ import java.io.Serializable;
 @Getter
 @Setter
 public class FriendResponse implements Serializable {
-    private UserResponse friend;
+    private UserResponse profile;
     private FriendStatus status;
 }

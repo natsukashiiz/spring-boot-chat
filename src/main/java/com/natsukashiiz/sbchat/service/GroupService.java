@@ -6,9 +6,9 @@ import com.natsukashiiz.sbchat.entity.*;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.exception.GroupException;
 import com.natsukashiiz.sbchat.model.request.AddMembersGroupRequest;
-import com.natsukashiiz.sbchat.model.request.UpdateGroupPhotoRequest;
 import com.natsukashiiz.sbchat.model.request.CreateGroupRequest;
 import com.natsukashiiz.sbchat.model.request.RenameGroupRequest;
+import com.natsukashiiz.sbchat.model.request.UpdateGroupPhotoRequest;
 import com.natsukashiiz.sbchat.model.response.ApiResponse;
 import com.natsukashiiz.sbchat.model.response.MemberGroupResponse;
 import com.natsukashiiz.sbchat.model.response.RoomResponse;
@@ -197,6 +197,13 @@ public class GroupService {
             message.setSender(user);
             message.setMention(member);
             messageRepository.save(message);
+
+            var inbox = new Inbox();
+            inbox.setUser(member);
+            inbox.setRoom(room);
+            inbox.setLastMessage(message);
+            inbox.setUnreadCount(1);
+            inboxRepository.save(inbox);
         }
 
         var response = createGroupRoomResponse(room);
@@ -234,6 +241,45 @@ public class GroupService {
         message.setSender(user);
         message.setMention(member.getUser());
         messageRepository.save(message);
+
+        inboxRepository.deleteByRoomIdAndUserId(roomId, memberId);
+
+        var response = createGroupRoomResponse(room);
+        return ResponseUtils.success(response);
+    }
+
+    @Transactional
+    public ApiResponse<RoomResponse> leaveGroup(Long roomId) throws BaseException {
+        var user = authService.getUser();
+        var room = roomRepository.findByIdAndMembersUserId(roomId, user.getId())
+                .orElseThrow(() -> {
+                    log.warn("LeaveGroup-[block]:(room not found). userId:{}, roomId:{}", user.getId(), roomId);
+                    return GroupException.notFound();
+                });
+
+        if (Objects.equals(user.getId(), room.getOwner().getId())) {
+            log.warn("LeaveGroup-[block]:(not permission). userId:{}, roomId:{}", user.getId(), roomId);
+            throw GroupException.notPermission();
+        }
+
+        var member = room.getMembers().stream()
+                .filter(it -> Objects.equals(it.getUser().getId(), user.getId()))
+                .findFirst()
+                .orElseThrow(() -> {
+                    log.warn("LeaveGroup-[block]:(member not found). userId:{}, roomId:{}", user.getId(), roomId);
+                    return GroupException.memberInvalid();
+                });
+
+        room.getMembers().remove(member);
+        roomMemberRepository.softDeleteByRoomIdAndUserId(roomId, user.getId());
+
+        var message = new Message();
+        message.setAction(MessageAction.LeaveChat);
+        message.setRoom(room);
+        message.setSender(user);
+        messageRepository.save(message);
+
+        inboxRepository.deleteByRoomIdAndUserId(roomId, user.getId());
 
         var response = createGroupRoomResponse(room);
         return ResponseUtils.success(response);

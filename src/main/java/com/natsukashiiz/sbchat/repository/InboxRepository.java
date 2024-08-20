@@ -11,4 +11,5 @@ public interface InboxRepository extends JpaRepository<Inbox, Long> {
     Optional<Inbox> findByRoomIdAndUserId(Long roomId, Long userId);
     List<Inbox> findByRoomIdAndUserIdNot(Long roomId, Long userId);
     List<Inbox> findAllByRoomId(Long roomId);
+    void deleteByRoomIdAndUserId(Long roomId, Long userId);
 }

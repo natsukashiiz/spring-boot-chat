@@ -2,11 +2,9 @@ package com.natsukashiiz.sbchat.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Setter
@@ -25,9 +23,4 @@ public class Inbox extends BaseEntity {
     private Message lastMessage;
 
     private Integer unreadCount;
-
-    @PrePersist
-    public void prePersist() {
-            this.unreadCount = 0;
-    }
 }

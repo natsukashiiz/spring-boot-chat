@@ -195,11 +195,13 @@ public class FriendService {
         var selfInboxEntity = inboxRepository.findByRoomIdAndUserId(roomEntity.getId(), selfUser.getId()).orElse(new Inbox());
         selfInboxEntity.setRoom(roomEntity);
         selfInboxEntity.setUser(selfUser);
+        selfInboxEntity.setUnreadCount(0);
         inboxRepository.save(selfInboxEntity);
 
         var friendInboxEntity = inboxRepository.findByRoomIdAndUserId(roomEntity.getId(), friendUser.getId()).orElse(new Inbox());
         friendInboxEntity.setRoom(roomEntity);
         friendInboxEntity.setUser(friendUser);
+        friendInboxEntity.setUnreadCount(1);
         inboxRepository.save(friendInboxEntity);
 
         friend.setStatus(FriendStatus.Friend);
@@ -313,7 +315,7 @@ public class FriendService {
         }
 
         var response = new FriendResponse();
-        response.setFriend(friendResponse);
+        response.setProfile(friendResponse);
         response.setStatus(status);
         return response;
     }

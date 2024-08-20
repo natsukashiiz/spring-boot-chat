@@ -57,6 +57,11 @@ public class GroupController {
         return groupService.kickGroupMember(roomId, userId);
     }
 
+    @DeleteMapping("/{roomId}/leave")
+    public ApiResponse<RoomResponse> leaveGroup(@PathVariable Long roomId) throws BaseException {
+        return groupService.leaveGroup(roomId);
+    }
+
     @DeleteMapping("/{roomId}")
     public ApiResponse<Object> deleteGroup(@PathVariable Long roomId) throws BaseException {
         return groupService.deleteGroup(roomId);

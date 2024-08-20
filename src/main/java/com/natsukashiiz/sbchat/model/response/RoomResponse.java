@@ -19,8 +19,9 @@ public class RoomResponse implements Serializable {
     private String name;
     private String image;
     private List<MemberGroupResponse> members = new ArrayList<>();
-    private UserResponse friend;
+    private FriendResponse friend;
     private List<MessageResponse> messages = new ArrayList<>();
     private Long messageCount;
     private Integer unreadCount;
+    private boolean muted = false;
 }

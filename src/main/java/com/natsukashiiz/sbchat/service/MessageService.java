@@ -126,8 +126,10 @@ public class MessageService {
                 continue;
             }
 
-            log.info("SendMessage:[next]. userId:{}, memberId:{}, message:{}", user.getId(), member.getUser().getId(), message);
-            messagingTemplate.convertAndSendToUser(member.getUser().getId().toString(), "/topic/messages", response);
+            if (Objects.equals(member.getMuted(), Boolean.FALSE)) {
+                log.info("SendMessage:[next]. userId:{}, memberId:{}, message:{}", user.getId(), member.getUser().getId(), message);
+                messagingTemplate.convertAndSendToUser(member.getUser().getId().toString(), "/topic/messages", response);
+            }
         }
 
         readAllMessages(roomId, user.getId());
@@ -182,15 +184,17 @@ public class MessageService {
                 continue;
             }
 
-            log.info("ReplyMessage:[next]. userId:{}, memberId:{}, message:{}", user.getId(), member.getUser().getId(), message);
-            messagingTemplate.convertAndSendToUser(member.getUser().getId().toString(), "/topic/messages", response);
+            if (Objects.equals(member.getMuted(), Boolean.FALSE)) {
+                log.info("ReplyMessage:[next]. userId:{}, memberId:{}, message:{}", user.getId(), member.getUser().getId(), message);
+                messagingTemplate.convertAndSendToUser(member.getUser().getId().toString(), "/topic/messages", response);
+            }
         }
 
         readAllMessages(roomId, user.getId());
         return ResponseUtils.success(response);
     }
 
-    public ApiResponse<Object> readAllMessages(Long roomId, Long userId) throws BaseException {
+    public void readAllMessages(Long roomId, Long userId) throws BaseException {
         var inbox = inboxRepository.findByRoomIdAndUserId(roomId, userId)
                 .orElseThrow(() -> {
                     log.warn("ReadAllMessages-[block]:(not found inbox). userId:{}, roomId:{}.", userId, roomId);
@@ -199,8 +203,6 @@ public class MessageService {
 
         inbox.setUnreadCount(0);
         inboxRepository.save(inbox);
-
-        return ResponseUtils.success();
     }
 
     @Transactional

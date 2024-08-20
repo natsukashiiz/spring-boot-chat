@@ -1,11 +1,11 @@
 package com.natsukashiiz.sbchat.service;
 
+import com.natsukashiiz.sbchat.common.FriendStatus;
 import com.natsukashiiz.sbchat.common.RoomType;
-import com.natsukashiiz.sbchat.entity.Inbox;
-import com.natsukashiiz.sbchat.entity.Message;
-import com.natsukashiiz.sbchat.entity.User;
+import com.natsukashiiz.sbchat.entity.*;
 import com.natsukashiiz.sbchat.exception.BaseException;
 import com.natsukashiiz.sbchat.model.response.*;
+import com.natsukashiiz.sbchat.repository.FriendRepository;
 import com.natsukashiiz.sbchat.repository.InboxRepository;
 import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import lombok.RequiredArgsConstructor;
@@ -22,19 +22,20 @@ public class InboxService {
 
     private final AuthService authService;
     private final InboxRepository inboxRepository;
+    private final FriendRepository friendRepository;
 
     public ApiResponse<List<InboxResponse>> getInboxes() throws BaseException {
         var user = authService.getUser();
 
         var responses = inboxRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId())
                 .stream()
-                .map(this::createInboxResponse)
+                .map(i -> createInboxResponse(i, user))
                 .toList();
 
         return ResponseUtils.successList(responses);
     }
 
-    private InboxResponse createInboxResponse(Inbox inbox) {
+    private InboxResponse createInboxResponse(Inbox inbox, User self) {
         var room = inbox.getRoom();
         var unreadCount = inbox.getUnreadCount();
 
@@ -50,9 +51,19 @@ public class InboxService {
                     .filter(m -> !m.getUser().getId().equals(inbox.getUser().getId()))
                     .findFirst()
                     .orElseThrow();
-            roomResponse.setFriend(createUserResponse(friend.getUser()));
+            var friendStatus = friendRepository.findByUserIdAndFriendId(self.getId(), friend.getUser().getId())
+                    .map(Friend::getStatus)
+                    .orElse(null);
+            roomResponse.setFriend(createFriendResponse(friend.getUser(), friendStatus));
             roomResponse.setName(friend.getUser().getNickname());
             roomResponse.setImage(friend.getUser().getAvatar());
+
+            var selfMuted = members.stream()
+                    .filter(m -> m.getUser().getId().equals(self.getId()))
+                    .findFirst()
+                    .map(RoomMember::getMuted)
+                    .orElse(false);
+            roomResponse.setMuted(selfMuted);
         } else {
             roomResponse.setMembers(members.stream()
                     .map(m -> createMemberResponse(m.getUser(), room.getOwner()))
@@ -77,6 +88,13 @@ public class InboxService {
 
         response.setRoom(roomResponse);
 
+        return response;
+    }
+
+    private FriendResponse createFriendResponse(User user, FriendStatus status) {
+        var response = new FriendResponse();
+        response.setProfile(createUserResponse(user));
+        response.setStatus(status);
         return response;
     }
 
@@ -113,6 +131,11 @@ public class InboxService {
         response.setType(message.getType());
         response.setContent(message.getContent());
         response.setSender(senderResponse);
+
+        if (Objects.nonNull(message.getMention())) {
+            response.setMention(createUserResponse(message.getMention()));
+        }
+
         response.setCreatedAt(message.getCreatedAt());
         return response;
     }
