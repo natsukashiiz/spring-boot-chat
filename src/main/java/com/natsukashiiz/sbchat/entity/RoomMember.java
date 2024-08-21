@@ -15,7 +15,7 @@ import org.hibernate.annotations.SQLRestriction;
 //@SQLRestriction("deleted_at IS NULL")
 public class RoomMember extends BaseEntity {
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     private Room room;
 
     @ManyToOne

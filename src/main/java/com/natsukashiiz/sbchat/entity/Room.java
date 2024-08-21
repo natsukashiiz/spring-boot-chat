@@ -33,4 +33,7 @@ public class Room extends BaseEntity {
     @OrderBy("id DESC, createdAt DESC")
     @SQLRestriction("deleted_at IS NULL")
     private List<RoomMember> members = new ArrayList<>();
+
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
+    private List<Inbox> inboxes = new ArrayList<>();
 }

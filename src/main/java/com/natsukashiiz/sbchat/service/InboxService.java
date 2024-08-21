@@ -10,6 +10,7 @@ import com.natsukashiiz.sbchat.repository.InboxRepository;
 import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,6 +24,7 @@ public class InboxService {
     private final AuthService authService;
     private final InboxRepository inboxRepository;
     private final FriendRepository friendRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ApiResponse<List<InboxResponse>> getInboxes() throws BaseException {
         var user = authService.getUser();
@@ -33,6 +35,11 @@ public class InboxService {
                 .toList();
 
         return ResponseUtils.successList(responses);
+    }
+
+    public void sendInboxWebsocket(Long userId, Inbox inbox, User user) {
+        var response = createInboxResponse(inbox, user);
+        messagingTemplate.convertAndSendToUser(userId.toString(), "/topic/inboxes", response);
     }
 
     private InboxResponse createInboxResponse(Inbox inbox, User self) {

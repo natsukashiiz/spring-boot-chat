@@ -17,6 +17,7 @@ import com.natsukashiiz.sbchat.utils.ResponseUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -34,6 +35,8 @@ public class GroupService {
     private final RoomMemberRepository roomMemberRepository;
     private final InboxRepository inboxRepository;
     private final MessageRepository messageRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final InboxService inboxService;
 
     public ApiResponse<List<RoomResponse>> getGroups() throws BaseException {
         var user = authService.getUser();
@@ -77,6 +80,8 @@ public class GroupService {
         lastMessage.setAction(MessageAction.CreateGroupChat);
         messageRepository.save(lastMessage);
 
+        var response = createGroupRoomResponse(roomEntity);
+
         request.getMemberIds().add(user.getId());
         for (var userId : request.getMemberIds()) {
 
@@ -99,9 +104,10 @@ public class GroupService {
             otherInbox.setLastMessage(lastMessage);
             otherInbox.setUnreadCount(1);
             inboxRepository.save(otherInbox);
+
+            inboxService.sendInboxWebsocket(member.getId(), otherInbox, member);
         }
 
-        var response = createGroupRoomResponse(roomEntity);
         return ResponseUtils.success(response);
     }
 
@@ -133,6 +139,19 @@ public class GroupService {
         message.setContent(request.getName());
         messageRepository.save(message);
 
+        List<RoomMember> roomMembers = room.getMembers();
+        for (var member : roomMembers) {
+            if (Objects.equals(member.getMuted(), Boolean.FALSE)) {
+                Inbox inbox = inboxRepository.findByRoomIdAndUserId(roomId, member.getUser().getId()).get();
+                inbox.setUser(member.getUser());
+                inbox.setLastMessage(message);
+                inbox.setUnreadCount(inbox.getUnreadCount() + 1);
+                inboxRepository.save(inbox);
+
+                inboxService.sendInboxWebsocket(member.getUser().getId(), inbox, member.getUser());
+            }
+        }
+
         var response = createGroupRoomResponse(room);
         return ResponseUtils.success(response);
     }
@@ -159,6 +178,19 @@ public class GroupService {
         message.setSender(user);
         message.setContent(request.getPhoto());
         messageRepository.save(message);
+
+        List<RoomMember> roomMembers = room.getMembers();
+        for (var member : roomMembers) {
+            if (Objects.equals(member.getMuted(), Boolean.FALSE)) {
+                Inbox inbox = inboxRepository.findByRoomIdAndUserId(roomId, member.getUser().getId()).get();
+                inbox.setUser(member.getUser());
+                inbox.setLastMessage(message);
+                inbox.setUnreadCount(inbox.getUnreadCount() + 1);
+                inboxRepository.save(inbox);
+
+                inboxService.sendInboxWebsocket(member.getUser().getId(), inbox, member.getUser());
+            }
+        }
 
         var response = createGroupRoomResponse(room);
         return ResponseUtils.success(response);
@@ -204,6 +236,8 @@ public class GroupService {
             inbox.setLastMessage(message);
             inbox.setUnreadCount(1);
             inboxRepository.save(inbox);
+
+            inboxService.sendInboxWebsocket(member.getId(), inbox, member);
         }
 
         var response = createGroupRoomResponse(room);
@@ -232,8 +266,6 @@ public class GroupService {
                     return GroupException.memberInvalid();
                 });
 
-        room.getMembers().remove(member);
-        roomMemberRepository.softDeleteByRoomIdAndUserId(roomId, memberId);
 
         var message = new Message();
         message.setAction(MessageAction.RemoveGroupMember);
@@ -242,9 +274,35 @@ public class GroupService {
         message.setMention(member.getUser());
         messageRepository.save(message);
 
+        {
+            Inbox inbox = inboxRepository.findByRoomIdAndUserId(roomId, memberId).get();
+            inbox.setUser(member.getUser());
+            inbox.setLastMessage(message);
+            inbox.setUnreadCount(inbox.getUnreadCount() + 1);
+            inboxRepository.save(inbox);
+
+            inboxService.sendInboxWebsocket(memberId, inbox, member.getUser());
+        }
+
+        room.getMembers().remove(member);
+        List<RoomMember> roomMembers = room.getMembers();
+        for (var roomMember : roomMembers) {
+            if (Objects.equals(roomMember.getMuted(), Boolean.FALSE)) {
+                Inbox inbox = inboxRepository.findByRoomIdAndUserId(roomId, roomMember.getUser().getId()).get();
+                inbox.setUser(roomMember.getUser());
+                inbox.setLastMessage(message);
+                inbox.setUnreadCount(inbox.getUnreadCount() + 1);
+                inboxRepository.save(inbox);
+
+                inboxService.sendInboxWebsocket(roomMember.getUser().getId(), inbox, roomMember.getUser());
+            }
+        }
+
+        roomMemberRepository.delete(member);
         inboxRepository.deleteByRoomIdAndUserId(roomId, memberId);
 
         var response = createGroupRoomResponse(room);
+
         return ResponseUtils.success(response);
     }
 
@@ -271,7 +329,9 @@ public class GroupService {
                 });
 
         room.getMembers().remove(member);
-        roomMemberRepository.softDeleteByRoomIdAndUserId(roomId, user.getId());
+        roomMemberRepository.delete(member);
+
+        inboxRepository.deleteByRoomIdAndUserId(roomId, user.getId());
 
         var message = new Message();
         message.setAction(MessageAction.LeaveChat);
@@ -279,7 +339,18 @@ public class GroupService {
         message.setSender(user);
         messageRepository.save(message);
 
-        inboxRepository.deleteByRoomIdAndUserId(roomId, user.getId());
+        List<RoomMember> roomMembers = room.getMembers();
+        for (var roomMember : roomMembers) {
+            if (Objects.equals(roomMember.getMuted(), Boolean.FALSE)) {
+                Inbox inbox = inboxRepository.findByRoomIdAndUserId(roomId, roomMember.getUser().getId()).get();
+                inbox.setUser(roomMember.getUser());
+                inbox.setLastMessage(message);
+                inbox.setUnreadCount(inbox.getUnreadCount() + 1);
+                inboxRepository.save(inbox);
+
+                inboxService.sendInboxWebsocket(roomMember.getUser().getId(), inbox, roomMember.getUser());
+            }
+        }
 
         var response = createGroupRoomResponse(room);
         return ResponseUtils.success(response);
@@ -299,7 +370,23 @@ public class GroupService {
             throw GroupException.notPermission();
         }
 
-        roomRepository.softDeleteById(room.getId());
+
+        List<RoomMember> roomMembers = room.getMembers();
+        for (var roomMember : roomMembers) {
+            if (Objects.equals(roomMember.getMuted(), Boolean.FALSE)) {
+                Inbox inbox = inboxRepository.findByRoomIdAndUserId(roomId, roomMember.getUser().getId()).get();
+                inbox.setUser(roomMember.getUser());
+                inbox.setRoom(room);
+                inbox.setLastMessage(null);
+                inbox.setUnreadCount(null);
+                inboxRepository.save(inbox);
+
+                inboxService.sendInboxWebsocket(roomMember.getUser().getId(), inbox, roomMember.getUser());
+            }
+        }
+
+        roomRepository.delete(room);
+
         return ResponseUtils.success();
     }
 
